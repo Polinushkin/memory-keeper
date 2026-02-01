@@ -1,35 +1,56 @@
-import { useState } from 'react'
-import reactLogo from './assets/react.svg'
-import viteLogo from '/vite.svg'
-import './App.css'
+import { Navigate, Route, Routes } from "react-router-dom";
+import Layout from "./components/Layout";
+import ProtectedRoute from "./components/ProtectedRoute";
+import Login from "./pages/Login";
+import Register from "./pages/Register";
+import Memories from "./pages/Memories";
 
-function App() {
-  const [count, setCount] = useState(0)
-
+function Placeholder({ title }: { title: string }) {
   return (
-    <>
-      <div>
-        <a href="https://vite.dev" target="_blank">
-          <img src={viteLogo} className="logo" alt="Vite logo" />
-        </a>
-        <a href="https://react.dev" target="_blank">
-          <img src={reactLogo} className="logo react" alt="React logo" />
-        </a>
-      </div>
-      <h1>Vite + React</h1>
+    <div className="page">
       <div className="card">
-        <button onClick={() => setCount((count) => count + 1)}>
-          count is {count}
-        </button>
-        <p>
-          Edit <code>src/App.tsx</code> and save to test HMR
-        </p>
+        <h2>{title}</h2>
+        <p>Заглушка. Сделаем на следующем этапе.</p>
       </div>
-      <p className="read-the-docs">
-        Click on the Vite and React logos to learn more
-      </p>
-    </>
-  )
+    </div>
+  );
 }
 
-export default App
+export default function App() {
+  return (
+    <Routes>
+      <Route element={<Layout />}>
+        <Route path="/" element={<Navigate to="/memories" replace />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<Register />} />
+
+        <Route
+          path="/memories"
+          element={
+            <ProtectedRoute>
+              <Memories />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/memories/new"
+          element={
+            <ProtectedRoute>
+              <Placeholder title="Create memory" />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/profile"
+          element={
+            <ProtectedRoute>
+              <Placeholder title="Profile" />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route path="*" element={<Placeholder title="Not found" />} />
+      </Route>
+    </Routes>
+  );
+}

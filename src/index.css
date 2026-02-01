@@ -1,68 +1,147 @@
 :root {
-  font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
-  line-height: 1.5;
-  font-weight: 400;
-
-  color-scheme: light dark;
-  color: rgba(255, 255, 255, 0.87);
-  background-color: #242424;
-
-  font-synthesis: none;
-  text-rendering: optimizeLegibility;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  --bg: #fff3e9;
+  --text: #111827;
+  --primary: #ff4d6d;   /* коралл */
+  --secondary: #7c3aed; /* фиолетовый */
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --error: #ef4444;
 }
 
-a {
-  font-weight: 500;
-  color: #646cff;
-  text-decoration: inherit;
-}
-a:hover {
-  color: #535bf2;
-}
-
+* { box-sizing: border-box; }
+html, body { height: 100%; }
 body {
   margin: 0;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app { min-height: 100vh; }
+
+.topbar {
+  max-width: 1100px;
+  margin: 24px auto 0;
+  padding: 12px 16px;
+  border-radius: 14px;
+  background: rgba(0,0,0,0.08);
   display: flex;
-  place-items: center;
-  min-width: 320px;
-  min-height: 100vh;
+  align-items: center;
+  justify-content: space-between;
 }
 
-h1 {
-  font-size: 3.2em;
-  line-height: 1.1;
+.brand {
+  text-decoration: none;
+  color: var(--text);
+  font-weight: 600;
+  padding: 8px 12px;
+  border-radius: 12px;
 }
 
-button {
-  border-radius: 8px;
-  border: 1px solid transparent;
-  padding: 0.6em 1.2em;
-  font-size: 1em;
-  font-weight: 500;
-  font-family: inherit;
-  background-color: #1a1a1a;
+.nav { display: flex; gap: 10px; }
+.navBtn {
+  text-decoration: none;
+  color: var(--text);
+  border: none;
   cursor: pointer;
-  transition: border-color 0.25s;
-}
-button:hover {
-  border-color: #646cff;
-}
-button:focus,
-button:focus-visible {
-  outline: 4px auto -webkit-focus-ring-color;
+  background: rgba(0,0,0,0.08);
+  padding: 10px 14px;
+  border-radius: 12px;
+  font: inherit;
 }
 
-@media (prefers-color-scheme: light) {
-  :root {
-    color: #213547;
-    background-color: #ffffff;
-  }
-  a:hover {
-    color: #747bff;
-  }
-  button {
-    background-color: #f9f9f9;
-  }
+.page {
+  display: grid;
+  place-items: center;
+  padding: 48px 16px;
+}
+.pageWide {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 32px 16px 64px;
+}
+
+.authCard {
+  width: 100%;
+  max-width: 440px;
+  padding: 26px;
+  border-radius: 18px;
+}
+
+.title { text-align: center; margin: 0 0 18px; font-size: 28px; }
+.titleCenter { text-align: center; margin: 18px 0 14px; font-size: 28px; }
+
+.form { display: grid; gap: 12px; }
+
+.input {
+  height: 40px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 0 12px;
+  outline: none;
+}
+.inputError { border-color: var(--error); }
+
+.pwRow { display: grid; grid-template-columns: 1fr auto; gap: 10px; align-items: center; }
+.linkBtn {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  color: var(--secondary);
+  font-weight: 600;
+}
+.smallLink {
+  text-align: center;
+  color: var(--text);
+  text-decoration: none;
+  opacity: 0.9;
+}
+.smallLink:hover { text-decoration: underline; }
+
+.btnPrimary {
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: var(--primary);
+  color: #1f2937;
+  font-weight: 700;
+  cursor: pointer;
+}
+.btnPrimary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.hint { font-size: 12px; opacity: 0.75; margin-top: -4px; }
+.error { color: var(--error); font-size: 12px; margin-top: -6px; }
+
+.centerRow { display: flex; justify-content: center; margin: 10px 0 22px; }
+
+.grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.memoryCard {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 18px;
+  text-align: center;
+}
+.memoryTitle { font-weight: 700; margin-bottom: 6px; }
+.memoryText { opacity: 0.85; margin-bottom: 10px; }
+.memoryDate { opacity: 0.7; font-size: 13px; }
+
+.card {
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 520px;
+}
+
+/* Mobile */
+@media (max-width: 760px) {
+  .topbar { margin-top: 16px; }
+  .grid { grid-template-columns: 1fr; }
 }
