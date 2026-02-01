@@ -10,7 +10,7 @@ function Placeholder({ title }: { title: string }) {
     <div className="page">
       <div className="card">
         <h2>{title}</h2>
-        <p>Заглушка. Сделаем на следующем этапе.</p>
+        <p>Будет сделано позже</p>
       </div>
     </div>
   );
