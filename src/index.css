@@ -1,8 +1,8 @@
 :root {
   --bg: #fff3e9;
   --text: #111827;
-  --primary: #ff4d6d;   /* коралл */
-  --secondary: #7c3aed; /* фиолетовый */
+  --primary: #ff4d6d;
+  --secondary: #7c3aed;
   --card: #ffffff;
   --border: #e5e7eb;
   --error: #ef4444;
@@ -139,6 +139,76 @@ body {
   padding: 20px;
   max-width: 520px;
 }
+
+.textarea {
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  padding: 10px 12px;
+  outline: none;
+  resize: vertical;
+  font: inherit;
+}
+
+.rowButtons {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+.btnSecondary {
+  height: 40px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.08);
+  color: var(--text);
+  font-weight: 700;
+  cursor: pointer;
+}
+.btnSecondary:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.cardActions {
+  display: flex;
+  gap: 10px;
+  margin-top: 12px;
+  justify-content: center;
+}
+
+.btnSmall {
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(0,0,0,0.08);
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.btnSmallDanger {
+  height: 34px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 70, 110, 0.20);
+  color: #b00020;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.btnSmall:disabled,
+.btnSmallDanger:disabled { opacity: 0.6; cursor: not-allowed; }
+
+.label {
+  font-size: 13px;
+  opacity: 0.75;
+  margin-top: 8px;
+}
+
+.success {
+  color: #1a7f37;
+  font-weight: 700;
+}
+
 
 /* Mobile */
 @media (max-width: 760px) {

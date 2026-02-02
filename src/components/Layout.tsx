@@ -13,17 +13,34 @@ export default function Layout() {
   return (
     <div className="app">
       <header className="topbar">
-        <Link className="brand" to="/memories">Memory Keeper</Link>
+        <Link className="brand" to={user ? "/memories" : "/login"}>
+          Memory Keeper
+        </Link>
 
         <div className="nav">
-          <NavLink className="navBtn" to="/profile">Profile</NavLink>
-
           {user ? (
-            <button className="navBtn" onClick={handleLogout}>Log out</button>
+            <>
+              <NavLink className="navBtn" to="/memories">
+                My memories
+              </NavLink>
+
+              <NavLink className="navBtn" to="/profile">
+                Profile
+              </NavLink>
+
+              <button className="navBtn" onClick={handleLogout}>
+                Log out
+              </button>
+            </>
           ) : (
             <>
-              <NavLink className="navBtn" to="/login">Login</NavLink>
-              <NavLink className="navBtn" to="/register">Register</NavLink>
+              <NavLink className="navBtn" to="/login">
+                Login
+              </NavLink>
+
+              <NavLink className="navBtn" to="/register">
+                Register
+              </NavLink>
             </>
           )}
         </div>

@@ -60,11 +60,11 @@ export default function Register() {
     try {
       const u = username.trim();
 
-      /*const taken = await isUsernameTaken(u);
+      const taken = await isUsernameTaken(u);
       if (taken) {
         setFieldError({ username: "Этот username уже занят" });
         return;
-      }*/
+      }
 
       const cred = await createUserWithEmailAndPassword(auth, email.trim(), password);
 

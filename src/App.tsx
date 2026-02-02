@@ -4,6 +4,10 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
 import Memories from "./pages/Memories";
+import MemoryForm from "./pages/MemoryForm";
+import Profile from "./pages/Profile";
+import MemoryEdit from "./pages/MemoryEdit";
+
 
 function Placeholder({ title }: { title: string }) {
   return (
@@ -32,19 +36,30 @@ export default function App() {
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/memories/new"
           element={
             <ProtectedRoute>
-              <Placeholder title="Create memory" />
+              <MemoryForm />
             </ProtectedRoute>
           }
         />
+
         <Route
           path="/profile"
           element={
             <ProtectedRoute>
-              <Placeholder title="Profile" />
+              <Profile />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route
+          path="/memories/:id/edit"
+          element={
+            <ProtectedRoute>
+              <MemoryEdit />
             </ProtectedRoute>
           }
         />
