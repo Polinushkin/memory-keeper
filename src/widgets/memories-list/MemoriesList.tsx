@@ -1,16 +1,16 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
 import {
   collection,
+  deleteDoc,
+  doc,
   onSnapshot,
   orderBy,
   query,
   where,
-  deleteDoc,
-  doc,
 } from "firebase/firestore";
-import { db } from "../api/firebase";
-import { useAuth } from "../contexts/AuthContext";
+import { useNavigate } from "react-router-dom";
+import { db } from "../../shared/api/firebase/firebase";
+import { useAuth } from "../../app/providers/auth-provider/useAuth";
 
 type MemoryItem = {
   id: string;
@@ -19,7 +19,7 @@ type MemoryItem = {
   date: string;
 };
 
-export default function Memories() {
+export default function MemoriesList() {
   const navigate = useNavigate();
   const { user } = useAuth();
 
@@ -64,6 +64,7 @@ export default function Memories() {
 
     setBusyId(id);
     setError(null);
+
     try {
       await deleteDoc(doc(db, "memories", id));
     } catch (e: any) {
@@ -73,56 +74,53 @@ export default function Memories() {
     }
   }
 
-  return (
-    <div className="pageWide">
-      <h1 className="titleCenter">My memories</h1>
-
-      <div className="centerRow">
-        <button className="btnPrimary" onClick={() => navigate("/memories/new")}>
-          Add memory
-        </button>
+  if (error) {
+    return (
+      <div className="card" style={{ marginTop: 16 }}>
+        <div className="error">{error}</div>
       </div>
+    );
+  }
 
-      {error && (
-        <div className="card" style={{ marginTop: 16 }}>
-          <div className="error">{error}</div>
-        </div>
-      )}
+  if (loading) {
+    return <div className="card">Loading...</div>;
+  }
 
-      {loading ? (
-        <div className="card">Loading...</div>
-      ) : items.length === 0 ? (
-        <div className="card" style={{ textAlign: "center" }}>
-          No memories yet. Create your first one ✨
-        </div>
-      ) : (
-        <div className="grid">
-          {items.map((m) => (
-            <div className="memoryCard" key={m.id}>
-              <div className="memoryTitle">{m.title}</div>
-              <div className="memoryText">{m.text}</div>
-              <div className="memoryDate">{formatDate(m.date)}</div>
+  if (items.length === 0) {
+    return (
+      <div className="card" style={{ textAlign: "center" }}>
+        No memories yet. Create your first one ✨
+      </div>
+    );
+  }
 
-              <div className="cardActions">
-                <button
-                  className="btnSmall"
-                  onClick={() => navigate(`/memories/${m.id}/edit`)}
-                  disabled={busyId === m.id}
-                >
-                  Edit
-                </button>
-                <button
-                  className="btnSmallDanger"
-                  onClick={() => onDelete(m.id)}
-                  disabled={busyId === m.id}
-                >
-                  {busyId === m.id ? "..." : "Delete"}
-                </button>
-              </div>
-            </div>
-          ))}
+  return (
+    <div className="grid">
+      {items.map((m) => (
+        <div className="memoryCard" key={m.id}>
+          <div className="memoryTitle">{m.title}</div>
+          <div className="memoryText">{m.text}</div>
+          <div className="memoryDate">{formatDate(m.date)}</div>
+
+          <div className="cardActions">
+            <button
+              className="btnSmall"
+              onClick={() => navigate(`/memories/${m.id}/edit`)}
+              disabled={busyId === m.id}
+            >
+              Edit
+            </button>
+
+            <button
+              className="btnSmallDanger"
+              onClick={() => onDelete(m.id)}
+              disabled={busyId === m.id}
+            >
+              {busyId === m.id ? "..." : "Delete"}
+            </button>
+          </div>
         </div>
-      )}
+      ))}
     </div>
   );
 }

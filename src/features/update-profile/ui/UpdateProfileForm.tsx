@@ -1,7 +1,13 @@
 import { useEffect, useState } from "react";
-import { doc, getDoc, serverTimestamp, setDoc, updateDoc } from "firebase/firestore";
-import { db } from "../api/firebase";
-import { useAuth } from "../contexts/AuthContext";
+import {
+  doc,
+  getDoc,
+  serverTimestamp,
+  setDoc,
+  updateDoc,
+} from "firebase/firestore";
+import { db } from "../../../shared/api/firebase/firebase";
+import { useAuth } from "../../../app/providers/auth-provider/useAuth";
 
 type UserProfile = {
   username?: string;
@@ -9,7 +15,7 @@ type UserProfile = {
   createdAt?: any;
 };
 
-export default function Profile() {
+export default function UpdateProfileForm() {
   const { user } = useAuth();
 
   const [loading, setLoading] = useState(true);
@@ -75,38 +81,32 @@ export default function Profile() {
   }
 
   if (loading) {
-    return (
-      <div className="page">
-        <div className="card">Loading...</div>
-      </div>
-    );
+    return <div className="card">Loading...</div>;
   }
 
   return (
-    <div className="page">
-      <div className="authCard">
-        <h1 className="title">Profile</h1>
+    <>
+      <h1 className="title">Profile</h1>
 
-        <div className="form">
-          <label className="label">Email</label>
-          <input className="input" value={email} disabled />
+      <div className="form">
+        <label className="label">Email</label>
+        <input className="input" value={email} disabled />
 
-          <label className="label">Username</label>
-          <input
-            className="input"
-            value={username}
-            onChange={(e) => setUsername(e.target.value)}
-            placeholder="Your username"
-          />
+        <label className="label">Username</label>
+        <input
+          className="input"
+          value={username}
+          onChange={(e) => setUsername(e.target.value)}
+          placeholder="Your username"
+        />
 
-          {error && <div className="error">{error}</div>}
-          {msg && <div className="success">{msg}</div>}
+        {error && <div className="error">{error}</div>}
+        {msg && <div className="success">{msg}</div>}
 
-          <button className="btnPrimary" onClick={onSave} disabled={saving}>
-            {saving ? "Saving..." : "Save"}
-          </button>
-        </div>
+        <button className="btnPrimary" onClick={onSave} disabled={saving}>
+          {saving ? "Saving..." : "Save"}
+        </button>
       </div>
-    </div>
+    </>
   );
 }
