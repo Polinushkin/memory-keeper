@@ -12,7 +12,7 @@ export default function ProtectedRoute({
   if (loading) {
     return (
       <div className="page">
-        <div className="card">Loading...</div>
+        <div className="card">Загрузка...</div>
       </div>
     );
   }

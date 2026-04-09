@@ -6,11 +6,11 @@ export default function MemoriesPage() {
 
   return (
     <div className="pageWide">
-      <h1 className="titleCenter">My memories</h1>
+      <h1 className="titleCenter">Мои воспоминания</h1>
 
       <div className="centerRow">
         <button className="btnPrimary" onClick={() => navigate("/memories/new")}>
-          Add memory
+          Создать воспоминание
         </button>
       </div>
 

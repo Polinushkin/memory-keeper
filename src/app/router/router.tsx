@@ -8,17 +8,7 @@ import MemoriesPage from "../../pages/memories-page/MemoriesPage";
 import ProfilePage from "../../pages/profile-page/ProfilePage";
 import CreateMemoryPage from "../../pages/create-memory-page/CreateMemoryPage";
 import EditMemoryPage from "../../pages/edit-memory-page/EditMemoryPage";
-
-function NotFoundPage() {
-  return (
-    <div className="page">
-      <div className="card">
-        <h2>Not found</h2>
-        <p>Страница не найдена</p>
-      </div>
-    </div>
-  );
-}
+import NotFoundPage from "../../pages/not-found-page/NotFoundPage";
 
 export const router = createBrowserRouter([
   {
@@ -39,9 +29,9 @@ export const router = createBrowserRouter([
       {
         path: "/memories",
         element: (
-            <ProtectedRoute>
+          <ProtectedRoute>
             <MemoriesPage />
-            </ProtectedRoute>
+          </ProtectedRoute>
         ),
       },
       {
@@ -63,9 +53,9 @@ export const router = createBrowserRouter([
       {
         path: "/profile",
         element: (
-            <ProtectedRoute>
+          <ProtectedRoute>
             <ProfilePage />
-            </ProtectedRoute>
+          </ProtectedRoute>
         ),
       },
       {

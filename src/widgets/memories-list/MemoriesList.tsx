@@ -11,12 +11,15 @@ import {
 import { useNavigate } from "react-router-dom";
 import { db } from "../../shared/api/firebase/firebase";
 import { useAuth } from "../../app/providers/auth-provider/useAuth";
+import { getErrorMessage } from "../../shared/lib/firebase-errors";
 
 type MemoryItem = {
   id: string;
   title: string;
   text: string;
   date: string;
+  place?: string;
+  emotion?: string;
 };
 
 export default function MemoriesList() {
@@ -45,12 +48,14 @@ export default function MemoriesList() {
           title: (d.data().title ?? "") as string,
           text: (d.data().text ?? "") as string,
           date: (d.data().date ?? "") as string,
+          place: (d.data().place ?? "") as string,
+          emotion: (d.data().emotion ?? "") as string,
         }));
         setItems(next);
         setLoading(false);
       },
       (e) => {
-        setError(e?.message ?? "Failed to load memories");
+        setError(e?.message ?? "Не удалось загрузить воспоминания");
         setLoading(false);
       }
     );
@@ -59,7 +64,7 @@ export default function MemoriesList() {
   }, [user]);
 
   async function onDelete(id: string) {
-    const ok = window.confirm("Delete this memory?");
+    const ok = window.confirm("Удалить это воспоминание?");
     if (!ok) return;
 
     setBusyId(id);
@@ -67,8 +72,8 @@ export default function MemoriesList() {
 
     try {
       await deleteDoc(doc(db, "memories", id));
-    } catch (e: any) {
-      setError(e?.message ?? "Failed to delete");
+    } catch (e: unknown) {
+      setError(getErrorMessage(e, "Не удалось удалить воспоминание"));
     } finally {
       setBusyId(null);
     }
@@ -83,13 +88,13 @@ export default function MemoriesList() {
   }
 
   if (loading) {
-    return <div className="card">Loading...</div>;
+    return <div className="card">Загрузка...</div>;
   }
 
   if (items.length === 0) {
     return (
-      <div className="card" style={{ textAlign: "center" }}>
-        No memories yet. Create your first one ✨
+      <div className="card emptyState" style={{ textAlign: "center" }}>
+        У вас пока нет воспоминаний. Создайте первое, чтобы начать вести архив.
       </div>
     );
   }
@@ -99,7 +104,13 @@ export default function MemoriesList() {
       {items.map((m) => (
         <div className="memoryCard" key={m.id}>
           <div className="memoryTitle">{m.title}</div>
-          <div className="memoryText">{m.text}</div>
+          <div className="memoryText">{m.text || "Без текста"}</div>
+          {(m.place || m.emotion) && (
+            <div className="memoryMeta">
+              {m.place && <span>{m.place}</span>}
+              {m.emotion && <span>{m.emotion}</span>}
+            </div>
+          )}
           <div className="memoryDate">{formatDate(m.date)}</div>
 
           <div className="cardActions">
@@ -108,7 +119,7 @@ export default function MemoriesList() {
               onClick={() => navigate(`/memories/${m.id}/edit`)}
               disabled={busyId === m.id}
             >
-              Edit
+              Редактировать
             </button>
 
             <button
@@ -116,7 +127,7 @@ export default function MemoriesList() {
               onClick={() => onDelete(m.id)}
               disabled={busyId === m.id}
             >
-              {busyId === m.id ? "..." : "Delete"}
+              {busyId === m.id ? "..." : "Удалить"}
             </button>
           </div>
         </div>

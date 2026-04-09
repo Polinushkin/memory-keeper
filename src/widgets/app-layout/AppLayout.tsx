@@ -21,25 +21,25 @@ export default function AppLayout() {
           {user ? (
             <>
               <NavLink className="navBtn" to="/memories">
-                My memories
+                Мои воспоминания
               </NavLink>
 
               <NavLink className="navBtn" to="/profile">
-                Profile
+                Профиль
               </NavLink>
 
               <button className="navBtn" onClick={handleLogout}>
-                Log out
+                Выйти
               </button>
             </>
           ) : (
             <>
               <NavLink className="navBtn" to="/login">
-                Login
+                Вход
               </NavLink>
 
               <NavLink className="navBtn" to="/register">
-                Register
+                Регистрация
               </NavLink>
             </>
           )}

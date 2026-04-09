@@ -1,15 +1,8 @@
-import React, { createContext, useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import type { User } from "firebase/auth";
 import { onAuthStateChanged, signOut } from "firebase/auth";
 import { auth } from "../../../shared/api/firebase/firebase";
-
-export type AuthContextValue = {
-  user: User | null;
-  loading: boolean;
-  logout: () => Promise<void>;
-};
-
-export const AuthContext = createContext<AuthContextValue | null>(null);
+import { AuthContext, type AuthContextValue } from "./auth-context";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
