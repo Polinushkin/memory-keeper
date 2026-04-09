@@ -6,9 +6,12 @@ export const MEMORY_TEXT_MAX = 10000;
 export const MEMORY_PLACE_MAX = 100;
 export const PROFILE_PHOTO_MAX_SIZE = 5 * 1024 * 1024;
 export const PROFILE_PHOTO_TYPES = ["image/jpeg", "image/png"];
-export const MEMORY_PHOTO_MAX_FILES = 10;
+export const MEMORY_PHOTO_MAX_FILES = 3;
 export const MEMORY_PHOTO_MAX_SIZE = 10 * 1024 * 1024;
 export const MEMORY_PHOTO_TYPES = ["image/jpeg", "image/png", "image/webp"];
+export const PROFILE_PHOTO_FIRESTORE_MAX_SIZE = 220 * 1024;
+export const MEMORY_PHOTO_FIRESTORE_MAX_SIZE = 180 * 1024;
+export const MEMORY_PHOTO_FIRESTORE_TOTAL_MAX_SIZE = 700 * 1024;
 export const EMOTIONS = [
   "Радость",
   "Грусть",

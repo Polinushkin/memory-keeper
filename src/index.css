@@ -262,6 +262,114 @@ body {
   gap: 6px;
 }
 
+.hiddenFileInput {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.filePicker {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.filePickerError {
+  border-color: var(--error);
+}
+
+.filePickerButton {
+  height: 38px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 12px;
+  background: rgba(255, 77, 109, 0.16);
+  color: #9f1239;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.filePickerText {
+  font-size: 14px;
+  color: rgba(17, 24, 39, 0.72);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.imagePreviewGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 12px;
+}
+
+.imagePreviewCard {
+  position: relative;
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.imagePreview {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+.imagePreviewMeta {
+  font-size: 12px;
+  line-height: 1.35;
+  color: rgba(17, 24, 39, 0.7);
+  word-break: break-word;
+}
+
+.imagePreviewDelete {
+  position: absolute;
+  top: 18px;
+  right: 18px;
+  border: none;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(17, 24, 39, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.avatarPreviewBlock {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 14px;
+  border-radius: 16px;
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.avatarPreview {
+  width: 140px;
+  height: 140px;
+  object-fit: cover;
+  border-radius: 50%;
+  border: 3px solid rgba(0, 0, 0, 0.08);
+}
+
 .fileItem {
   padding: 8px 10px;
   border-radius: 10px;
@@ -272,9 +380,41 @@ body {
   overflow-wrap: anywhere;
 }
 
+.memoryPhotoWrap {
+  position: relative;
+  margin-bottom: 12px;
+}
+
+.memoryPhoto {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 14px;
+}
+
+.memoryPhotoCount {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  padding: 4px 8px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.82);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 
 /* Mobile */
 @media (max-width: 760px) {
   .topbar { margin-top: 16px; }
   .grid { grid-template-columns: 1fr; }
+  .filePicker {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .filePickerText {
+    white-space: normal;
+  }
 }

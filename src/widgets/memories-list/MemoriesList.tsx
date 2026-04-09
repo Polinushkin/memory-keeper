@@ -20,6 +20,7 @@ type MemoryItem = {
   date: string;
   place?: string;
   emotion?: string;
+  photos?: Array<{ name?: string; dataUrl?: string }>;
 };
 
 export default function MemoriesList() {
@@ -50,6 +51,9 @@ export default function MemoriesList() {
           date: (d.data().date ?? "") as string,
           place: (d.data().place ?? "") as string,
           emotion: (d.data().emotion ?? "") as string,
+          photos: Array.isArray(d.data().photos)
+            ? (d.data().photos as Array<{ name?: string; dataUrl?: string }>)
+            : [],
         }));
         setItems(next);
         setLoading(false);
@@ -103,6 +107,18 @@ export default function MemoriesList() {
     <div className="grid">
       {items.map((m) => (
         <div className="memoryCard" key={m.id}>
+          {m.photos?.[0]?.dataUrl && (
+            <div className="memoryPhotoWrap">
+              <img
+                className="memoryPhoto"
+                src={m.photos[0].dataUrl}
+                alt={m.photos[0].name || m.title}
+              />
+              {m.photos.length > 1 && (
+                <div className="memoryPhotoCount">+{m.photos.length - 1}</div>
+              )}
+            </div>
+          )}
           <div className="memoryTitle">{m.title}</div>
           <div className="memoryText">{m.text || "Без текста"}</div>
           {(m.place || m.emotion) && (
