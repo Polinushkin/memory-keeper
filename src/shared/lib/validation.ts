@@ -4,6 +4,9 @@ export const PROFILE_DESCRIPTION_MAX = 200;
 export const MEMORY_TITLE_MAX = 100;
 export const MEMORY_TEXT_MAX = 10000;
 export const MEMORY_PLACE_MAX = 100;
+export const MEMORY_CATEGORY_MAX = 50;
+export const MEMORY_TAG_MAX = 30;
+export const MEMORY_TAGS_PER_GROUP_MAX = 10;
 export const PROFILE_PHOTO_MAX_SIZE = 5 * 1024 * 1024;
 export const PROFILE_PHOTO_TYPES = ["image/jpeg", "image/png"];
 export const MEMORY_PHOTO_MAX_FILES = 3;
@@ -159,9 +162,30 @@ export function validateMemoryPlace(place: string) {
   return "";
 }
 
+export function validateMemoryCategory(category: string) {
+  if (category.trim().length > MEMORY_CATEGORY_MAX) {
+    return `Название категории должно быть не длиннее ${MEMORY_CATEGORY_MAX} символов`;
+  }
+
+  return "";
+}
+
 export function validateMemoryEmotion(emotion: string) {
   if (!emotion) {
     return "Выберите эмоцию";
+  }
+
+  return "";
+}
+
+export function validateMemoryTagList(tags: string[], label: string) {
+  if (tags.length > MEMORY_TAGS_PER_GROUP_MAX) {
+    return `${label}: не более ${MEMORY_TAGS_PER_GROUP_MAX} тегов`;
+  }
+
+  const oversizedTag = tags.find((tag) => tag.length > MEMORY_TAG_MAX);
+  if (oversizedTag) {
+    return `${label}: каждый тег должен быть не длиннее ${MEMORY_TAG_MAX} символов`;
   }
 
   return "";

@@ -68,6 +68,10 @@ body {
   border-radius: 18px;
 }
 
+.formCardWide {
+  max-width: 760px;
+}
+
 .title { text-align: center; margin: 0 0 18px; font-size: 28px; }
 .titleCenter { text-align: center; margin: 18px 0 14px; font-size: 28px; }
 
@@ -124,6 +128,35 @@ body {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+.memoriesLayout {
+  display: grid;
+  gap: 18px;
+}
+
+.toolbarRow {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+.panelToggle {
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 10px 18px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.panelToggleActive {
+  background: rgba(255, 77, 109, 0.14);
+  border-color: rgba(255, 77, 109, 0.38);
+  color: #9f1239;
+}
+
 .memoryCard {
   background: var(--card);
   border: 1px solid var(--border);
@@ -131,6 +164,8 @@ body {
   padding: 18px;
   text-align: center;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
 }
 .memoryTitle {
   font-weight: 700;
@@ -172,6 +207,52 @@ body {
   background: rgba(0,0,0,0.06);
 }
 .memoryDate { opacity: 0.7; font-size: 13px; }
+
+.memoryCardTop {
+  display: flex;
+  justify-content: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 10px;
+  min-height: 58px;
+  align-content: flex-start;
+}
+
+.memoryMain {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+}
+
+.memoryFooter {
+  margin-top: auto;
+  display: grid;
+  gap: 14px;
+}
+
+.memoryDetails {
+  display: grid;
+  gap: 8px;
+  margin: 12px 0;
+  text-align: left;
+  min-height: 188px;
+}
+
+.memoryInlineMeta {
+  font-size: 13px;
+  color: rgba(17, 24, 39, 0.75);
+  min-height: 20px;
+}
+
+.memoryInlineMetaEmpty {
+  visibility: hidden;
+}
+
+.memoryDateGroup {
+  display: grid;
+  gap: 4px;
+  min-height: 50px;
+}
 
 .card {
   background: var(--card);
@@ -245,6 +326,34 @@ body {
   font-size: 13px;
   opacity: 0.75;
   margin-top: 8px;
+}
+
+.sectionCard {
+  max-width: none;
+}
+
+.floatingPanel {
+  box-shadow: 0 20px 48px rgba(17, 24, 39, 0.08);
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+  text-align: left;
+}
+
+.sectionTitle {
+  font-size: 20px;
+  font-weight: 700;
+}
+
+.sectionText {
+  color: rgba(17, 24, 39, 0.72);
+  line-height: 1.45;
+  margin-top: 4px;
 }
 
 .success {
@@ -325,6 +434,11 @@ body {
   background: rgba(255, 255, 255, 0.72);
 }
 
+.imagePreviewCardDragging {
+  opacity: 0.6;
+  transform: scale(0.98);
+}
+
 .imagePreview {
   width: 100%;
   aspect-ratio: 1 / 1;
@@ -337,6 +451,18 @@ body {
   line-height: 1.35;
   color: rgba(17, 24, 39, 0.7);
   word-break: break-word;
+}
+
+.imagePreviewOrder {
+  position: absolute;
+  left: 18px;
+  top: 18px;
+  border-radius: 999px;
+  padding: 6px 10px;
+  background: rgba(255, 255, 255, 0.92);
+  color: rgba(17, 24, 39, 0.76);
+  font-size: 12px;
+  font-weight: 700;
 }
 
 .imagePreviewDelete {
@@ -405,11 +531,246 @@ body {
   font-weight: 700;
 }
 
+.chipGroup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.chipButton {
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 8px 14px;
+  cursor: pointer;
+  font: inherit;
+}
+
+.chipButtonActive {
+  background: rgba(255, 77, 109, 0.18);
+  border-color: rgba(255, 77, 109, 0.45);
+  color: #9f1239;
+  font-weight: 700;
+}
+
+.tagPreview {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.tagPreview span,
+.pillBadge {
+  padding: 5px 10px;
+  border-radius: 999px;
+  background: rgba(255, 77, 109, 0.12);
+  color: #9f1239;
+  font-size: 12px;
+  font-weight: 700;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.pillBadgeMuted {
+  background: rgba(17, 24, 39, 0.08);
+  color: rgba(17, 24, 39, 0.72);
+}
+
+.tagRow {
+  display: grid;
+  gap: 6px;
+  min-height: 44px;
+}
+
+.tagRowLabel {
+  font-size: 13px;
+  color: rgba(17, 24, 39, 0.72);
+}
+
+.tagRowEmpty {
+  visibility: hidden;
+}
+
+.accessTypeGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.accessTypeCard {
+  display: grid;
+  gap: 4px;
+  text-align: left;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.92);
+  cursor: pointer;
+  font: inherit;
+}
+
+.accessTypeCardActive {
+  border-color: rgba(255, 77, 109, 0.45);
+  background: rgba(255, 77, 109, 0.12);
+}
+
+.accessTypeTitle {
+  font-weight: 700;
+}
+
+.accessTypeDescription {
+  font-size: 12px;
+  color: rgba(17, 24, 39, 0.7);
+}
+
+.sortPanelRow {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+}
+
+.sortPanelField {
+  flex: 1;
+}
+
+.categoryCreateRow {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.categoryManagerList {
+  display: grid;
+  gap: 10px;
+}
+
+.categoryManagerItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.categoryManagerActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.filtersGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.filterActions {
+  justify-content: end;
+}
+
+.panelActions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 16px;
+  gap: 10px;
+}
+
+.emotionPill[data-emotion="Грусть"],
+.chipButton[data-emotion="Грусть"] {
+  background: rgba(96, 165, 250, 0.18);
+  border-color: rgba(59, 130, 246, 0.32);
+  color: #1d4ed8;
+}
+
+.emotionPill[data-emotion="Восторг"],
+.chipButton[data-emotion="Восторг"] {
+  background: rgba(251, 146, 60, 0.18);
+  border-color: rgba(249, 115, 22, 0.32);
+  color: #c2410c;
+}
+
+.emotionPill[data-emotion="Радость"],
+.chipButton[data-emotion="Радость"] {
+  background: rgba(250, 204, 21, 0.22);
+  border-color: rgba(234, 179, 8, 0.36);
+  color: #a16207;
+}
+
+.emotionPill[data-emotion="Вдохновение"],
+.chipButton[data-emotion="Вдохновение"] {
+  background: rgba(103, 232, 249, 0.2);
+  border-color: rgba(6, 182, 212, 0.3);
+  color: #0f766e;
+}
+
+.emotionPill[data-emotion="Ностальгия"],
+.chipButton[data-emotion="Ностальгия"] {
+  background: rgba(156, 163, 175, 0.2);
+  border-color: rgba(107, 114, 128, 0.28);
+  color: #4b5563;
+}
+
+.emotionPill[data-emotion="Спокойствие"],
+.chipButton[data-emotion="Спокойствие"] {
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(148, 163, 184, 0.9);
+  color: #475569;
+}
+
+.chipButtonActive[data-emotion="Грусть"] {
+  background: rgba(96, 165, 250, 0.28);
+}
+
+.chipButtonActive[data-emotion="Восторг"] {
+  background: rgba(251, 146, 60, 0.28);
+}
+
+.chipButtonActive[data-emotion="Радость"] {
+  background: rgba(250, 204, 21, 0.32);
+}
+
+.chipButtonActive[data-emotion="Вдохновение"] {
+  background: rgba(103, 232, 249, 0.3);
+}
+
+.chipButtonActive[data-emotion="Ностальгия"] {
+  background: rgba(156, 163, 175, 0.28);
+}
+
+.chipButtonActive[data-emotion="Спокойствие"] {
+  background: rgba(255, 255, 255, 1);
+}
+
 
 /* Mobile */
 @media (max-width: 760px) {
   .topbar { margin-top: 16px; }
   .grid { grid-template-columns: 1fr; }
+  .filtersGrid,
+  .accessTypeGrid,
+  .categoryCreateRow {
+    grid-template-columns: 1fr;
+  }
+  .toolbarRow,
+  .sortPanelRow,
+  .panelActions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .categoryManagerItem,
+  .topbar,
+  .nav,
+  .sectionHeader {
+    flex-direction: column;
+    align-items: stretch;
+  }
   .filePicker {
     flex-direction: column;
     align-items: stretch;
