@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   collection,
   deleteDoc,
@@ -7,7 +7,7 @@ import {
   query,
   where,
 } from "firebase/firestore";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { deleteCategory, getUserCategories, renameCategory, saveUserCategories } from "../../entities/memory/api/categories";
 import {
   findSimilarCategory,
@@ -20,6 +20,7 @@ import {
 import { db } from "../../shared/api/firebase/firebase";
 import { useAuth } from "../../app/providers/auth-provider/useAuth";
 import { getErrorMessage } from "../../shared/lib/firebase-errors";
+import { searchUsersByUsername, type UserSearchResult } from "../../shared/lib/users";
 import { MEMORY_CATEGORY_MAX, validateMemoryCategory } from "../../shared/lib/validation";
 
 type SortMode =
@@ -30,9 +31,21 @@ type SortMode =
   | "title-asc"
   | "title-desc";
 
+const DEFAULT_SORT_MODE: SortMode = "created-desc";
+
 export default function MemoriesList() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  const initialSearch = searchParams.get("search") ?? "";
+  const initialCategory = searchParams.get("category") ?? "";
+  const initialTag = searchParams.get("tag") ?? "";
+  const initialPlace = searchParams.get("place") ?? "";
+  const initialDateFrom = searchParams.get("dateFrom") ?? "";
+  const initialDateTo = searchParams.get("dateTo") ?? "";
+  const initialAccessType = searchParams.get("access") ?? "";
+  const initialSort = (searchParams.get("sort") as SortMode | null) ?? DEFAULT_SORT_MODE;
 
   const [items, setItems] = useState<NormalizedMemory[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
@@ -41,23 +54,30 @@ export default function MemoriesList() {
   const [error, setError] = useState<string | null>(null);
   const [categoryName, setCategoryName] = useState("");
   const [categoryError, setCategoryError] = useState<string | null>(null);
+
   const [showCategoriesPanel, setShowCategoriesPanel] = useState(false);
+  const [showSearchPanel, setShowSearchPanel] = useState(Boolean(initialSearch));
   const [showSortPanel, setShowSortPanel] = useState(false);
   const [showFiltersPanel, setShowFiltersPanel] = useState(false);
 
-  const [selectedCategory, setSelectedCategory] = useState("");
-  const [tagFilter, setTagFilter] = useState("");
-  const [placeFilter, setPlaceFilter] = useState("");
-  const [dateFrom, setDateFrom] = useState("");
-  const [dateTo, setDateTo] = useState("");
-  const [accessTypeFilter, setAccessTypeFilter] = useState("");
-  const [appliedCategory, setAppliedCategory] = useState("");
-  const [appliedTagFilter, setAppliedTagFilter] = useState("");
-  const [appliedPlaceFilter, setAppliedPlaceFilter] = useState("");
-  const [appliedDateFrom, setAppliedDateFrom] = useState("");
-  const [appliedDateTo, setAppliedDateTo] = useState("");
-  const [appliedAccessTypeFilter, setAppliedAccessTypeFilter] = useState("");
-  const [sortMode, setSortMode] = useState<SortMode>("created-desc");
+  const [searchQuery, setSearchQuery] = useState(initialSearch);
+  const [appliedSearchQuery, setAppliedSearchQuery] = useState(initialSearch);
+  const [searchingUsers, setSearchingUsers] = useState(false);
+  const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
+
+  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
+  const [tagFilter, setTagFilter] = useState(initialTag);
+  const [placeFilter, setPlaceFilter] = useState(initialPlace);
+  const [dateFrom, setDateFrom] = useState(initialDateFrom);
+  const [dateTo, setDateTo] = useState(initialDateTo);
+  const [accessTypeFilter, setAccessTypeFilter] = useState(initialAccessType);
+  const [appliedCategory, setAppliedCategory] = useState(initialCategory);
+  const [appliedTagFilter, setAppliedTagFilter] = useState(initialTag);
+  const [appliedPlaceFilter, setAppliedPlaceFilter] = useState(initialPlace);
+  const [appliedDateFrom, setAppliedDateFrom] = useState(initialDateFrom);
+  const [appliedDateTo, setAppliedDateTo] = useState(initialDateTo);
+  const [appliedAccessTypeFilter, setAppliedAccessTypeFilter] = useState(initialAccessType);
+  const [sortMode, setSortMode] = useState<SortMode>(initialSort);
 
   useEffect(() => {
     if (!user) return;
@@ -68,10 +88,7 @@ export default function MemoriesList() {
       .then(setCategories)
       .catch(() => setCategories([]));
 
-    const q = query(
-      collection(db, "memories"),
-      where("ownerId", "==", user.uid)
-    );
+    const q = query(collection(db, "memories"), where("ownerId", "==", user.uid));
 
     const unsub = onSnapshot(
       q,
@@ -80,14 +97,80 @@ export default function MemoriesList() {
         setItems(next);
         setLoading(false);
       },
-      (e) => {
-        setError(e?.message ?? "Не удалось загрузить воспоминания");
+      (snapshotError) => {
+        setError(snapshotError?.message ?? "Не удалось загрузить воспоминания");
         setLoading(false);
       }
     );
 
     return () => unsub();
   }, [user]);
+
+  useEffect(() => {
+    if (!user || !appliedSearchQuery.trim()) {
+      setUserResults([]);
+      return;
+    }
+
+    const currentUserId = user.uid;
+
+    async function loadUsers() {
+      setSearchingUsers(true);
+      try {
+        setUserResults(await searchUsersByUsername(appliedSearchQuery, currentUserId));
+      } catch {
+        setUserResults([]);
+      } finally {
+        setSearchingUsers(false);
+      }
+    }
+
+    void loadUsers();
+  }, [appliedSearchQuery, user]);
+
+  const currentListQueryString = useMemo(() => {
+    const next = new URLSearchParams();
+    if (appliedSearchQuery) next.set("search", appliedSearchQuery);
+    if (appliedCategory) next.set("category", appliedCategory);
+    if (appliedTagFilter) next.set("tag", appliedTagFilter);
+    if (appliedPlaceFilter) next.set("place", appliedPlaceFilter);
+    if (appliedDateFrom) next.set("dateFrom", appliedDateFrom);
+    if (appliedDateTo) next.set("dateTo", appliedDateTo);
+    if (appliedAccessTypeFilter) next.set("access", appliedAccessTypeFilter);
+    if (sortMode !== DEFAULT_SORT_MODE) next.set("sort", sortMode);
+    return next.toString();
+  }, [
+    appliedAccessTypeFilter,
+    appliedCategory,
+    appliedDateFrom,
+    appliedDateTo,
+    appliedPlaceFilter,
+    appliedSearchQuery,
+    appliedTagFilter,
+    sortMode,
+  ]);
+
+  function syncParams(next: {
+    search?: string;
+    category?: string;
+    tag?: string;
+    place?: string;
+    dateFrom?: string;
+    dateTo?: string;
+    access?: string;
+    sort?: string;
+  }) {
+    const params = new URLSearchParams();
+    if (next.search) params.set("search", next.search);
+    if (next.category) params.set("category", next.category);
+    if (next.tag) params.set("tag", next.tag);
+    if (next.place) params.set("place", next.place);
+    if (next.dateFrom) params.set("dateFrom", next.dateFrom);
+    if (next.dateTo) params.set("dateTo", next.dateTo);
+    if (next.access) params.set("access", next.access);
+    if (next.sort && next.sort !== DEFAULT_SORT_MODE) params.set("sort", next.sort);
+    setSearchParams(params);
+  }
 
   async function onDelete(id: string) {
     const ok = window.confirm("Удалить это воспоминание?");
@@ -98,8 +181,8 @@ export default function MemoriesList() {
 
     try {
       await deleteDoc(doc(db, "memories", id));
-    } catch (e: unknown) {
-      setError(getErrorMessage(e, "Не удалось удалить воспоминание"));
+    } catch (deleteError: unknown) {
+      setError(getErrorMessage(deleteError, "Не удалось удалить воспоминание"));
     } finally {
       setBusyId(null);
     }
@@ -139,8 +222,8 @@ export default function MemoriesList() {
       setCategories(nextCategories);
       setCategoryName("");
       setCategoryError(null);
-    } catch (e: unknown) {
-      setCategoryError(parseCategoryError(e, "Не удалось создать категорию"));
+    } catch (createError: unknown) {
+      setCategoryError(parseCategoryError(createError, "Не удалось создать категорию"));
     }
   }
 
@@ -175,8 +258,8 @@ export default function MemoriesList() {
       if (appliedCategory === category) {
         setAppliedCategory(normalizeCategoryName(nextName));
       }
-    } catch (e: unknown) {
-      setCategoryError(parseCategoryError(e, "Не удалось переименовать категорию"));
+    } catch (renameError: unknown) {
+      setCategoryError(parseCategoryError(renameError, "Не удалось переименовать категорию"));
     }
   }
 
@@ -200,8 +283,8 @@ export default function MemoriesList() {
       if (appliedCategory === category) {
         setAppliedCategory("");
       }
-    } catch (e: unknown) {
-      setCategoryError(getErrorMessage(e, "Не удалось удалить категорию"));
+    } catch (deleteError: unknown) {
+      setCategoryError(getErrorMessage(deleteError, "Не удалось удалить категорию"));
     }
   }
 
@@ -228,22 +311,25 @@ export default function MemoriesList() {
       return item.place.toLowerCase().includes(normalizedQuery)
         || item.placeTags.some((tag) => tag.toLowerCase().includes(normalizedQuery));
     })
-    .filter((item) => {
-      if (!appliedDateFrom) {
-        return true;
-      }
-
-      return item.date >= appliedDateFrom;
-    })
-    .filter((item) => {
-      if (!appliedDateTo) {
-        return true;
-      }
-
-      return item.date <= appliedDateTo;
-    })
+    .filter((item) => !appliedDateFrom || item.date >= appliedDateFrom)
+    .filter((item) => !appliedDateTo || item.date <= appliedDateTo)
     .filter((item) => appliedAccessTypeFilter ? item.accessType === appliedAccessTypeFilter : true)
     .sort((left, right) => sortItems(left, right, sortMode));
+
+  const normalizedSearchQuery = appliedSearchQuery.trim().toLowerCase();
+  const memorySearchResults = normalizedSearchQuery
+    ? items.filter((item) => {
+        const textForSearch = [
+          item.title,
+          item.text,
+          ...item.emotionTags,
+          ...item.placeTags,
+          ...item.customTags,
+        ].join(" ").toLowerCase();
+
+        return textForSearch.includes(normalizedSearchQuery);
+      })
+    : [];
 
   if (error) {
     return (
@@ -266,6 +352,13 @@ export default function MemoriesList() {
           onClick={() => setShowCategoriesPanel((value) => !value)}
         >
           Категории
+        </button>
+        <button
+          type="button"
+          className={`panelToggle ${showSearchPanel ? "panelToggleActive" : ""}`}
+          onClick={() => setShowSearchPanel((value) => !value)}
+        >
+          Поиск
         </button>
         <button
           type="button"
@@ -318,6 +411,87 @@ export default function MemoriesList() {
         </section>
       )}
 
+      {showSearchPanel && (
+        <section className="card sectionCard floatingPanel">
+          <div className="sectionHeader">
+            <div>
+              <div className="sectionTitle">Поиск</div>
+              <div className="sectionText">Поиск по воспоминаниям выполняется по заголовку, тексту и тегам, поиск пользователей - по username.</div>
+            </div>
+          </div>
+          <div className="searchPanelRow">
+            <div className="field searchPanelField">
+              <input
+                className="input"
+                placeholder="Например, лето или Москва"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter") {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  const nextQuery = searchQuery.trim();
+                  setAppliedSearchQuery(nextQuery);
+                  syncParams({
+                    search: nextQuery,
+                    category: appliedCategory,
+                    tag: appliedTagFilter,
+                    place: appliedPlaceFilter,
+                    dateFrom: appliedDateFrom,
+                    dateTo: appliedDateTo,
+                    access: appliedAccessTypeFilter,
+                    sort: sortMode,
+                  });
+                }}
+              />
+            </div>
+            <button
+              className="btnPrimary"
+              type="button"
+              onClick={() => {
+                const nextQuery = searchQuery.trim();
+                setAppliedSearchQuery(nextQuery);
+                syncParams({
+                  search: nextQuery,
+                  category: appliedCategory,
+                  tag: appliedTagFilter,
+                  place: appliedPlaceFilter,
+                  dateFrom: appliedDateFrom,
+                  dateTo: appliedDateTo,
+                  access: appliedAccessTypeFilter,
+                  sort: sortMode,
+                });
+              }}
+            >
+              Искать
+            </button>
+            <button
+              className="btnSecondary"
+              type="button"
+              onClick={() => {
+                setSearchQuery("");
+                setAppliedSearchQuery("");
+                setUserResults([]);
+                syncParams({
+                  search: "",
+                  category: appliedCategory,
+                  tag: appliedTagFilter,
+                  place: appliedPlaceFilter,
+                  dateFrom: appliedDateFrom,
+                  dateTo: appliedDateTo,
+                  access: appliedAccessTypeFilter,
+                  sort: sortMode,
+                });
+              }}
+            >
+              Сбросить
+            </button>
+          </div>
+        </section>
+      )}
+
       {showSortPanel && (
         <section className="card sectionCard floatingPanel">
           <div className="sectionHeader">
@@ -329,7 +503,24 @@ export default function MemoriesList() {
           <div className="sortPanelRow">
             <div className="field sortPanelField">
               <label className="label">Как сортировать</label>
-              <select className="input" value={sortMode} onChange={(e) => setSortMode(e.target.value as SortMode)}>
+              <select
+                className="input"
+                value={sortMode}
+                onChange={(e) => {
+                  const nextSort = e.target.value as SortMode;
+                  setSortMode(nextSort);
+                  syncParams({
+                    search: appliedSearchQuery,
+                    category: appliedCategory,
+                    tag: appliedTagFilter,
+                    place: appliedPlaceFilter,
+                    dateFrom: appliedDateFrom,
+                    dateTo: appliedDateTo,
+                    access: appliedAccessTypeFilter,
+                    sort: nextSort,
+                  });
+                }}
+              >
                 <option value="created-desc">По дате создания: новые сверху</option>
                 <option value="created-asc">По дате создания: старые сверху</option>
                 <option value="event-desc">По дате события: новые сверху</option>
@@ -341,7 +532,19 @@ export default function MemoriesList() {
             <button
               className="btnSecondary"
               type="button"
-              onClick={() => setSortMode("created-desc")}
+              onClick={() => {
+                setSortMode(DEFAULT_SORT_MODE);
+                syncParams({
+                  search: appliedSearchQuery,
+                  category: appliedCategory,
+                  tag: appliedTagFilter,
+                  place: appliedPlaceFilter,
+                  dateFrom: appliedDateFrom,
+                  dateTo: appliedDateTo,
+                  access: appliedAccessTypeFilter,
+                  sort: DEFAULT_SORT_MODE,
+                });
+              }}
             >
               Сбросить сортировку
             </button>
@@ -400,6 +603,16 @@ export default function MemoriesList() {
                 setAppliedDateFrom(dateFrom);
                 setAppliedDateTo(dateTo);
                 setAppliedAccessTypeFilter(accessTypeFilter);
+                syncParams({
+                  search: appliedSearchQuery,
+                  category: selectedCategory,
+                  tag: tagFilter,
+                  place: placeFilter,
+                  dateFrom,
+                  dateTo,
+                  access: accessTypeFilter,
+                  sort: sortMode,
+                });
               }}
             >
               Применить
@@ -420,10 +633,83 @@ export default function MemoriesList() {
                 setAppliedDateFrom("");
                 setAppliedDateTo("");
                 setAppliedAccessTypeFilter("");
+                syncParams({
+                  search: appliedSearchQuery,
+                  category: "",
+                  tag: "",
+                  place: "",
+                  dateFrom: "",
+                  dateTo: "",
+                  access: "",
+                  sort: sortMode,
+                });
               }}
             >
               Сбросить фильтры
             </button>
+          </div>
+        </section>
+      )}
+
+      {appliedSearchQuery && (
+        <section className="card sectionCard">
+          <div className="sectionHeader">
+            <div>
+              <div className="sectionTitle">Результаты поиска</div>
+              <div className="sectionText">Запрос: {appliedSearchQuery}</div>
+            </div>
+          </div>
+
+          <div className="searchResultsSection">
+            <div className="searchResultsTitle">Воспоминания</div>
+            {memorySearchResults.length > 0 ? (
+              <div className="searchResultsList">
+                {memorySearchResults.map((item) => (
+                  <div className="searchResultItem" key={`memory-${item.id}`}>
+                    <div className="searchResultBody">
+                      <div className="searchResultTitle">{renderHighlightedText(item.title, appliedSearchQuery)}</div>
+                      <div className="searchResultPreview">{renderHighlightedText(getMemoryPreview(item), appliedSearchQuery)}</div>
+                      <div className="searchResultMeta">
+                        <span>{item.category || "Без категории"}</span>
+                        <span>{formatDate(item.date)}</span>
+                      </div>
+                    </div>
+                    <button className="btnSmall" type="button" onClick={() => navigate(`/memories/${item.id}${currentListQueryString ? `?${currentListQueryString}` : ""}`)}>
+                      Открыть
+                    </button>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="emptyState">Совпадений по воспоминаниям не найдено.</div>
+            )}
+          </div>
+
+          <div className="searchResultsSection">
+            <div className="searchResultsTitle">Пользователи</div>
+            {searchingUsers ? (
+              <div className="emptyState">Ищем пользователей...</div>
+            ) : userResults.length > 0 ? (
+              <div className="searchResultsList">
+                {userResults.map((item) => (
+                  <div className="searchResultItem" key={`user-${item.id}`}>
+                    <div className="searchUserIdentity">
+                      {item.avatarDataUrl ? (
+                        <img className="searchUserAvatar" src={item.avatarDataUrl} alt={item.username} />
+                      ) : (
+                        <div className="searchUserAvatarPlaceholder">{item.username.slice(0, 1).toUpperCase()}</div>
+                      )}
+                      <div className="searchResultBody">
+                        <div className="searchResultTitle">@{renderHighlightedText(item.username, appliedSearchQuery)}</div>
+                        <div className="searchResultPreview">{item.description || "Пользователь найден"}</div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="emptyState">Пользователи по username не найдены.</div>
+            )}
           </div>
         </section>
       )}
@@ -474,8 +760,15 @@ export default function MemoriesList() {
 
                 <div className="cardActions">
                   <button
+                    className="btnSmall btnIcon"
+                    title="Просмотреть"
+                    onClick={() => navigate(`/memories/${item.id}${currentListQueryString ? `?${currentListQueryString}` : ""}`)}
+                  >
+                    ↗
+                  </button>
+                  <button
                     className="btnSmall"
-                    onClick={() => navigate(`/memories/${item.id}/edit`)}
+                    onClick={() => navigate(`/memories/${item.id}/edit${currentListQueryString ? `?returnTo=${encodeURIComponent(`/memories/${item.id}?${currentListQueryString}`)}` : ""}`)}
                     disabled={busyId === item.id}
                   >
                     Редактировать
@@ -545,11 +838,11 @@ function compareStrings(left: string, right: string) {
   return left.localeCompare(right, "ru");
 }
 
-function formatDate(d: string) {
-  if (!d) return "не указано";
-  const [y, m, day] = d.split("-");
-  if (!y || !m || !day) return d;
-  return `${day}.${m}.${y}`;
+function formatDate(date: string) {
+  if (!date) return "не указано";
+  const [year, month, day] = date.split("-");
+  if (!year || !month || !day) return date;
+  return `${day}.${month}.${year}`;
 }
 
 function formatCreatedAt(date: Date | null) {
@@ -576,4 +869,31 @@ function parseCategoryError(error: unknown, fallback: string) {
   }
 
   return getErrorMessage(error, fallback);
+}
+
+function getMemoryPreview(item: NormalizedMemory) {
+  const firstTag = getAllTags(item)[0];
+  const parts = [item.text.trim(), firstTag ? `Тег: ${firstTag}` : "", item.place ? `Место: ${item.place}` : ""]
+    .filter(Boolean)
+    .join(" • ");
+
+  return parts || "Краткое превью недоступно";
+}
+
+function renderHighlightedText(text: string, query: string) {
+  const normalizedQuery = query.trim();
+  if (!normalizedQuery) {
+    return text;
+  }
+
+  const pattern = new RegExp(`(${escapeRegExp(normalizedQuery)})`, "ig");
+  return text.split(pattern).map((part, index) => (
+    index % 2 === 1
+      ? <mark className="searchHighlight" key={`${part}-${index}`}>{part}</mark>
+      : <span key={`${part}-${index}`}>{part}</span>
+  ));
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 }

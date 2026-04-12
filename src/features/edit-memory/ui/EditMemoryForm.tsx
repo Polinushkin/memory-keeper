@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { doc, getDoc, updateDoc } from "firebase/firestore";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../app/providers/auth-provider/useAuth";
 import { appendUserCategory, getUserCategories } from "../../../entities/memory/api/categories";
 import {
@@ -56,6 +56,7 @@ type MemoryRecord = MemoryDocument & { ownerId?: string };
 export default function EditMemoryForm() {
   const { id } = useParams();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { user } = useAuth();
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
@@ -259,6 +260,7 @@ export default function EditMemoryForm() {
   const placeTagsPreview = parseTagInput(placeTagsInput);
   const customTagsPreview = parseTagInput(customTagsInput);
   const categoryOptions = Array.from(new Set([...categories, selectedCategory].filter(Boolean))).sort((left, right) => left.localeCompare(right, "ru"));
+  const returnTo = searchParams.get("returnTo");
 
   return (
     <>
@@ -382,7 +384,7 @@ export default function EditMemoryForm() {
         </div>
         {error && <div className="error">{error}</div>}
         <div className="rowButtons">
-          <button type="button" className="btnSecondary" onClick={() => navigate("/memories")} disabled={saving}>Отмена</button>
+          <button type="button" className="btnSecondary" onClick={() => navigate(returnTo || "/memories")} disabled={saving}>Отмена</button>
           <button className="btnPrimary" disabled={saving}>{saving ? "Сохраняем..." : "Сохранить"}</button>
         </div>
       </form>

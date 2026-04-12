@@ -5,6 +5,7 @@ import ProtectedRoute from "./ProtectedRoute";
 import LoginPage from "../../pages/login-page/LoginPage";
 import RegisterPage from "../../pages/register-page/RegisterPage";
 import MemoriesPage from "../../pages/memories-page/MemoriesPage";
+import MemoryDetailsPage from "../../pages/memory-details-page/MemoryDetailsPage";
 import ProfilePage from "../../pages/profile-page/ProfilePage";
 import CreateMemoryPage from "../../pages/create-memory-page/CreateMemoryPage";
 import EditMemoryPage from "../../pages/edit-memory-page/EditMemoryPage";
@@ -39,6 +40,14 @@ export const router = createBrowserRouter([
         element: (
           <ProtectedRoute>
             <CreateMemoryPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/memories/:id",
+        element: (
+          <ProtectedRoute>
+            <MemoryDetailsPage />
           </ProtectedRoute>
         ),
       },

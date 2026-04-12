@@ -63,6 +63,8 @@ export default function SignUpForm() {
           uid: credential.user.uid,
           username,
           email,
+          avatarDataUrl: "",
+          description: "",
         });
       } catch (reserveError) {
         await deleteUser(credential.user).catch(() => undefined);
@@ -89,6 +91,7 @@ export default function SignUpForm() {
         email: email.trim(),
         description: "",
         avatarFileName: "",
+        avatarDataUrl: "",
         createdAt: serverTimestamp(),
       });
 

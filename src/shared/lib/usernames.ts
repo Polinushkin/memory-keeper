@@ -1,6 +1,11 @@
-import { deleteDoc, doc, getDoc, runTransaction } from "firebase/firestore";
+import { deleteDoc, doc, getDoc, runTransaction, setDoc } from "firebase/firestore";
 import { db } from "../api/firebase/firebase";
 import { normalizeUsername } from "./validation";
+
+type UsernameMetadata = {
+  avatarDataUrl?: string;
+  description?: string;
+};
 
 export function getUsernameRef(username: string) {
   return doc(db, "usernames", normalizeUsername(username));
@@ -21,6 +26,8 @@ export async function reserveUsername(params: {
   username: string;
   email: string;
   currentUsername?: string;
+  avatarDataUrl?: string;
+  description?: string;
 }) {
   const normalized = normalizeUsername(params.username);
   const currentNormalized = normalizeUsername(params.currentUsername ?? "");
@@ -43,12 +50,29 @@ export async function reserveUsername(params: {
       username: params.username.trim(),
       usernameLower: normalized,
       email: params.email.trim(),
+      avatarDataUrl: params.avatarDataUrl ?? "",
+      description: params.description ?? "",
     });
 
     if (currentRef && currentNormalized !== normalized) {
       transaction.delete(currentRef);
     }
   });
+}
+
+export async function updateUsernameMetadata(username: string, metadata: UsernameMetadata) {
+  if (!username.trim()) {
+    return;
+  }
+
+  await setDoc(
+    getUsernameRef(username),
+    {
+      avatarDataUrl: metadata.avatarDataUrl ?? "",
+      description: metadata.description ?? "",
+    },
+    { merge: true }
+  );
 }
 
 export async function releaseUsername(username: string) {

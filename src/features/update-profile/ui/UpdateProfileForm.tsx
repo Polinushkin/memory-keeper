@@ -4,7 +4,7 @@ import { useAuth } from "../../../app/providers/auth-provider/useAuth";
 import { db } from "../../../shared/api/firebase/firebase";
 import { getErrorMessage } from "../../../shared/lib/firebase-errors";
 import { prepareImageForFirestore } from "../../../shared/lib/images";
-import { reserveUsername } from "../../../shared/lib/usernames";
+import { reserveUsername, updateUsernameMetadata } from "../../../shared/lib/usernames";
 import {
   PROFILE_DESCRIPTION_MAX,
   PROFILE_PHOTO_FIRESTORE_MAX_SIZE,
@@ -119,7 +119,14 @@ export default function UpdateProfileForm() {
     setSaving(true);
     try {
       if (normalizeUsername(username) !== normalizeUsername(initialUsername)) {
-        await reserveUsername({ uid: user.uid, username, email, currentUsername: initialUsername });
+        await reserveUsername({
+          uid: user.uid,
+          username,
+          email,
+          currentUsername: initialUsername,
+          avatarDataUrl: pendingAvatar?.dataUrl ?? avatarDataUrl,
+          description,
+        });
       }
       await updateDoc(doc(db, "users", user.uid), {
         username: username.trim(),
@@ -127,6 +134,10 @@ export default function UpdateProfileForm() {
         description: description.trim(),
         avatarFileName: pendingAvatar?.name ?? avatarFileName,
         avatarDataUrl: pendingAvatar?.dataUrl ?? avatarDataUrl,
+      });
+      await updateUsernameMetadata(username.trim(), {
+        avatarDataUrl: pendingAvatar?.dataUrl ?? avatarDataUrl,
+        description: description.trim(),
       });
       if (pendingAvatar) {
         setAvatarFileName(pendingAvatar.name);
