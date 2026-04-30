@@ -4,7 +4,7 @@ import { signInWithEmailAndPassword } from "firebase/auth";
 import { Link, useNavigate } from "react-router-dom";
 import { auth } from "../../../shared/api/firebase/firebase";
 import { getAuthErrorMessage, getErrorMessage } from "../../../shared/lib/firebase-errors";
-import { getEmailByUsername } from "../../../shared/lib/usernames";
+import { getEmailByUsername } from "../../../entities/user";
 import { normalizeUsername, type ValidationErrors } from "../../../shared/lib/validation";
 
 type SignInField = "login" | "password";

@@ -10,26 +10,9 @@ import {
   startAt,
   where,
 } from "firebase/firestore";
-import { db } from "../api/firebase/firebase";
-import { normalizeUsername } from "./validation";
-
-type UserRow = {
-  username?: string;
-  usernameLower?: string;
-};
-
-type UsernameRow = {
-  uid?: string;
-  username?: string;
-  usernameLower?: string;
-  description?: string;
-  avatarDataUrl?: string;
-};
-
-type UserProfileRow = {
-  description?: string;
-  avatarDataUrl?: string;
-};
+import { db } from "../../../shared/api/firebase/firebase";
+import { normalizeUsername } from "../../../shared/lib/validation";
+import type { UserProfileRow, UserRow, UserSearchResult, UsernameRow } from "../model/user";
 
 export async function isUsernameTaken(username: string, currentUid?: string) {
   const normalized = normalizeUsername(username);
@@ -54,14 +37,6 @@ export async function isUsernameTaken(username: string, currentUid?: string) {
     return normalizeUsername(data.usernameLower ?? data.username ?? "") === normalized;
   });
 }
-
-export type UserSearchResult = {
-  id: string;
-  username: string;
-  usernameLower: string;
-  description: string;
-  avatarDataUrl: string;
-};
 
 export async function searchUsersByUsername(username: string, currentUid?: string) {
   const normalized = normalizeUsername(username);

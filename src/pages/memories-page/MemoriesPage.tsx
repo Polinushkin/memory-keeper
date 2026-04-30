@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import MemoriesList from "../../widgets/memories-list/MemoriesList";
+import { MemoriesList } from "../../widgets/memories-list";
 
 export default function MemoriesPage() {
   const navigate = useNavigate();

@@ -1,14 +1,9 @@
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../app/providers/auth-provider/useAuth";
+import { SignOutButton } from "../../features/sign-out";
 
 export default function AppLayout() {
-  const { user, logout } = useAuth();
-  const navigate = useNavigate();
-
-  async function handleLogout() {
-    await logout();
-    navigate("/login");
-  }
+  const { user } = useAuth();
 
   return (
     <div className="app">
@@ -28,9 +23,7 @@ export default function AppLayout() {
                 Профиль
               </NavLink>
 
-              <button className="navBtn" onClick={handleLogout}>
-                Выйти
-              </button>
+              <SignOutButton />
             </>
           ) : (
             <>

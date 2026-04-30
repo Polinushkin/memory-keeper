@@ -1,11 +1,7 @@
 import { deleteDoc, doc, getDoc, runTransaction, setDoc } from "firebase/firestore";
-import { db } from "../api/firebase/firebase";
-import { normalizeUsername } from "./validation";
-
-type UsernameMetadata = {
-  avatarDataUrl?: string;
-  description?: string;
-};
+import { db } from "../../../shared/api/firebase/firebase";
+import { normalizeUsername } from "../../../shared/lib/validation";
+import type { UsernameMetadata } from "../model/user";
 
 export function getUsernameRef(username: string) {
   return doc(db, "usernames", normalizeUsername(username));
@@ -41,7 +37,12 @@ export async function reserveUsername(params: {
     if (nextSnap.exists()) {
       const ownerUid = String(nextSnap.data()?.uid ?? "");
       if (ownerUid !== params.uid) {
-        throw new Error("USERNAME_TAKEN");
+        const ownerProfileRef = doc(db, "users", ownerUid);
+        const ownerProfileSnap = await transaction.get(ownerProfileRef);
+
+        if (ownerProfileSnap.exists()) {
+          throw new Error("USERNAME_TAKEN");
+        }
       }
     }
 

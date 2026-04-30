@@ -8,30 +8,34 @@ import {
   where,
 } from "firebase/firestore";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { deleteCategory, getUserCategories, renameCategory, saveUserCategories } from "../../entities/memory/api/categories";
 import {
-  findSimilarCategory,
-  getAllTags,
-  MEMORY_ACCESS_TYPES,
-  normalizeCategoryName,
+  applyMemoryFilters,
+  DEFAULT_MEMORY_SORT_MODE,
+  getMemoryPreview,
+  getUserCategories,
   normalizeMemory,
+  searchMemoriesByQuery,
+  sortMemories,
+  type MemoryFilters,
+  type MemorySortMode,
   type NormalizedMemory,
-} from "../../entities/memory/model/memory";
-import { db } from "../../shared/api/firebase/firebase";
+} from "../../entities/memory";
+import { searchUsersByUsername, type UserSearchResult } from "../../entities/user";
+import { ManageMemoryCategories } from "../../features/manage-memory-categories";
+import { MemoryFiltersPanel } from "../../features/memory-filters";
+import { MemorySortingPanel } from "../../features/memory-sorting";
 import { useAuth } from "../../app/providers/auth-provider/useAuth";
+import { db } from "../../shared/api/firebase/firebase";
 import { getErrorMessage } from "../../shared/lib/firebase-errors";
-import { searchUsersByUsername, type UserSearchResult } from "../../shared/lib/users";
-import { MEMORY_CATEGORY_MAX, validateMemoryCategory } from "../../shared/lib/validation";
 
-type SortMode =
-  | "created-desc"
-  | "created-asc"
-  | "event-desc"
-  | "event-asc"
-  | "title-asc"
-  | "title-desc";
-
-const DEFAULT_SORT_MODE: SortMode = "created-desc";
+const EMPTY_FILTERS: MemoryFilters = {
+  category: "",
+  tag: "",
+  place: "",
+  dateFrom: "",
+  dateTo: "",
+  accessType: "",
+};
 
 export default function MemoriesList() {
   const navigate = useNavigate();
@@ -39,21 +43,21 @@ export default function MemoriesList() {
   const [searchParams, setSearchParams] = useSearchParams();
 
   const initialSearch = searchParams.get("search") ?? "";
-  const initialCategory = searchParams.get("category") ?? "";
-  const initialTag = searchParams.get("tag") ?? "";
-  const initialPlace = searchParams.get("place") ?? "";
-  const initialDateFrom = searchParams.get("dateFrom") ?? "";
-  const initialDateTo = searchParams.get("dateTo") ?? "";
-  const initialAccessType = searchParams.get("access") ?? "";
-  const initialSort = (searchParams.get("sort") as SortMode | null) ?? DEFAULT_SORT_MODE;
+  const initialSort = (searchParams.get("sort") as MemorySortMode | null) ?? DEFAULT_MEMORY_SORT_MODE;
+  const initialFilters: MemoryFilters = {
+    category: searchParams.get("category") ?? "",
+    tag: searchParams.get("tag") ?? "",
+    place: searchParams.get("place") ?? "",
+    dateFrom: searchParams.get("dateFrom") ?? "",
+    dateTo: searchParams.get("dateTo") ?? "",
+    accessType: (searchParams.get("access") ?? "") as MemoryFilters["accessType"],
+  };
 
   const [items, setItems] = useState<NormalizedMemory[]>([]);
   const [categories, setCategories] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [categoryName, setCategoryName] = useState("");
-  const [categoryError, setCategoryError] = useState<string | null>(null);
 
   const [showCategoriesPanel, setShowCategoriesPanel] = useState(false);
   const [showSearchPanel, setShowSearchPanel] = useState(Boolean(initialSearch));
@@ -65,19 +69,9 @@ export default function MemoriesList() {
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
 
-  const [selectedCategory, setSelectedCategory] = useState(initialCategory);
-  const [tagFilter, setTagFilter] = useState(initialTag);
-  const [placeFilter, setPlaceFilter] = useState(initialPlace);
-  const [dateFrom, setDateFrom] = useState(initialDateFrom);
-  const [dateTo, setDateTo] = useState(initialDateTo);
-  const [accessTypeFilter, setAccessTypeFilter] = useState(initialAccessType);
-  const [appliedCategory, setAppliedCategory] = useState(initialCategory);
-  const [appliedTagFilter, setAppliedTagFilter] = useState(initialTag);
-  const [appliedPlaceFilter, setAppliedPlaceFilter] = useState(initialPlace);
-  const [appliedDateFrom, setAppliedDateFrom] = useState(initialDateFrom);
-  const [appliedDateTo, setAppliedDateTo] = useState(initialDateTo);
-  const [appliedAccessTypeFilter, setAppliedAccessTypeFilter] = useState(initialAccessType);
-  const [sortMode, setSortMode] = useState<SortMode>(initialSort);
+  const [draftFilters, setDraftFilters] = useState<MemoryFilters>(initialFilters);
+  const [appliedFilters, setAppliedFilters] = useState<MemoryFilters>(initialFilters);
+  const [sortMode, setSortMode] = useState<MemorySortMode>(initialSort);
 
   useEffect(() => {
     if (!user) return;
@@ -88,13 +82,12 @@ export default function MemoriesList() {
       .then(setCategories)
       .catch(() => setCategories([]));
 
-    const q = query(collection(db, "memories"), where("ownerId", "==", user.uid));
+    const memoriesQuery = query(collection(db, "memories"), where("ownerId", "==", user.uid));
 
-    const unsub = onSnapshot(
-      q,
-      (snap) => {
-        const next = snap.docs.map((item) => normalizeMemory(item.id, item.data()));
-        setItems(next);
+    const unsubscribe = onSnapshot(
+      memoriesQuery,
+      (snapshot) => {
+        setItems(snapshot.docs.map((item) => normalizeMemory(item.id, item.data())));
         setLoading(false);
       },
       (snapshotError) => {
@@ -103,7 +96,7 @@ export default function MemoriesList() {
       }
     );
 
-    return () => unsub();
+    return () => unsubscribe();
   }, [user]);
 
   useEffect(() => {
@@ -128,27 +121,31 @@ export default function MemoriesList() {
     void loadUsers();
   }, [appliedSearchQuery, user]);
 
+  const categoryOptions = useMemo(() => (
+    Array.from(new Set([...categories, ...items.map((item) => item.category).filter(Boolean)]))
+      .sort((left, right) => left.localeCompare(right, "ru"))
+  ), [categories, items]);
+
   const currentListQueryString = useMemo(() => {
     const next = new URLSearchParams();
     if (appliedSearchQuery) next.set("search", appliedSearchQuery);
-    if (appliedCategory) next.set("category", appliedCategory);
-    if (appliedTagFilter) next.set("tag", appliedTagFilter);
-    if (appliedPlaceFilter) next.set("place", appliedPlaceFilter);
-    if (appliedDateFrom) next.set("dateFrom", appliedDateFrom);
-    if (appliedDateTo) next.set("dateTo", appliedDateTo);
-    if (appliedAccessTypeFilter) next.set("access", appliedAccessTypeFilter);
-    if (sortMode !== DEFAULT_SORT_MODE) next.set("sort", sortMode);
+    if (appliedFilters.category) next.set("category", appliedFilters.category);
+    if (appliedFilters.tag) next.set("tag", appliedFilters.tag);
+    if (appliedFilters.place) next.set("place", appliedFilters.place);
+    if (appliedFilters.dateFrom) next.set("dateFrom", appliedFilters.dateFrom);
+    if (appliedFilters.dateTo) next.set("dateTo", appliedFilters.dateTo);
+    if (appliedFilters.accessType) next.set("access", appliedFilters.accessType);
+    if (sortMode !== DEFAULT_MEMORY_SORT_MODE) next.set("sort", sortMode);
     return next.toString();
-  }, [
-    appliedAccessTypeFilter,
-    appliedCategory,
-    appliedDateFrom,
-    appliedDateTo,
-    appliedPlaceFilter,
-    appliedSearchQuery,
-    appliedTagFilter,
-    sortMode,
-  ]);
+  }, [appliedFilters, appliedSearchQuery, sortMode]);
+
+  const filteredItems = useMemo(() => (
+    sortMemories(applyMemoryFilters(items, appliedFilters), sortMode)
+  ), [items, appliedFilters, sortMode]);
+
+  const memorySearchResults = useMemo(() => (
+    searchMemoriesByQuery(items, appliedSearchQuery)
+  ), [items, appliedSearchQuery]);
 
   function syncParams(next: {
     search?: string;
@@ -168,13 +165,13 @@ export default function MemoriesList() {
     if (next.dateFrom) params.set("dateFrom", next.dateFrom);
     if (next.dateTo) params.set("dateTo", next.dateTo);
     if (next.access) params.set("access", next.access);
-    if (next.sort && next.sort !== DEFAULT_SORT_MODE) params.set("sort", next.sort);
+    if (next.sort && next.sort !== DEFAULT_MEMORY_SORT_MODE) params.set("sort", next.sort);
     setSearchParams(params);
   }
 
   async function onDelete(id: string) {
-    const ok = window.confirm("Удалить это воспоминание?");
-    if (!ok) return;
+    const confirmed = window.confirm("Удалить это воспоминание?");
+    if (!confirmed) return;
 
     setBusyId(id);
     setError(null);
@@ -188,148 +185,26 @@ export default function MemoriesList() {
     }
   }
 
-  async function handleCreateCategory() {
-    if (!user) {
-      return;
-    }
+  function syncCurrentState(next: {
+    search?: string;
+    filters?: MemoryFilters;
+    sort?: MemorySortMode;
+  }) {
+    const search = next.search ?? appliedSearchQuery;
+    const filters = next.filters ?? appliedFilters;
+    const sort = next.sort ?? sortMode;
 
-    const nextName = normalizeCategoryName(categoryName);
-    const validationError = validateMemoryCategory(nextName);
-    if (validationError) {
-      setCategoryError(validationError);
-      return;
-    }
-
-    if (!nextName) {
-      setCategoryError("Введите название категории");
-      return;
-    }
-
-    if (categories.includes(nextName)) {
-      setCategoryError("Такая категория уже есть");
-      return;
-    }
-
-    const similarCategory = findSimilarCategory(categories, nextName);
-    if (similarCategory) {
-      setCategoryError(`Похожая категория уже есть: ${similarCategory}`);
-      return;
-    }
-
-    try {
-      const nextCategories = [...categories, nextName].sort((left, right) => left.localeCompare(right, "ru"));
-      await saveUserCategories(user.uid, nextCategories);
-      setCategories(nextCategories);
-      setCategoryName("");
-      setCategoryError(null);
-    } catch (createError: unknown) {
-      setCategoryError(parseCategoryError(createError, "Не удалось создать категорию"));
-    }
+    syncParams({
+      search,
+      category: filters.category,
+      tag: filters.tag,
+      place: filters.place,
+      dateFrom: filters.dateFrom,
+      dateTo: filters.dateTo,
+      access: filters.accessType,
+      sort,
+    });
   }
-
-  async function handleRenameCategory(category: string) {
-    if (!user) {
-      return;
-    }
-
-    const nextName = window.prompt("Новое название категории", category);
-    if (nextName === null) {
-      return;
-    }
-
-    const validationError = validateMemoryCategory(nextName);
-    if (validationError) {
-      setCategoryError(validationError);
-      return;
-    }
-
-    if (!normalizeCategoryName(nextName)) {
-      setCategoryError("Название категории не может быть пустым");
-      return;
-    }
-
-    try {
-      const nextCategories = await renameCategory(user.uid, category, nextName);
-      setCategories(nextCategories);
-      setCategoryError(null);
-      if (selectedCategory === category) {
-        setSelectedCategory(normalizeCategoryName(nextName));
-      }
-      if (appliedCategory === category) {
-        setAppliedCategory(normalizeCategoryName(nextName));
-      }
-    } catch (renameError: unknown) {
-      setCategoryError(parseCategoryError(renameError, "Не удалось переименовать категорию"));
-    }
-  }
-
-  async function handleDeleteCategory(category: string) {
-    if (!user) {
-      return;
-    }
-
-    const ok = window.confirm(`Удалить категорию "${category}"? У воспоминаний она будет очищена.`);
-    if (!ok) {
-      return;
-    }
-
-    try {
-      const nextCategories = await deleteCategory(user.uid, category);
-      setCategories(nextCategories);
-      setCategoryError(null);
-      if (selectedCategory === category) {
-        setSelectedCategory("");
-      }
-      if (appliedCategory === category) {
-        setAppliedCategory("");
-      }
-    } catch (deleteError: unknown) {
-      setCategoryError(getErrorMessage(deleteError, "Не удалось удалить категорию"));
-    }
-  }
-
-  const categoryOptions = Array.from(
-    new Set([...categories, ...items.map((item) => item.category).filter(Boolean)])
-  ).sort((left, right) => left.localeCompare(right, "ru"));
-
-  const filteredItems = items
-    .filter((item) => appliedCategory ? item.category === appliedCategory : true)
-    .filter((item) => {
-      if (!appliedTagFilter.trim()) {
-        return true;
-      }
-
-      const normalizedQuery = appliedTagFilter.trim().toLowerCase();
-      return getAllTags(item).some((tag) => tag.toLowerCase().includes(normalizedQuery));
-    })
-    .filter((item) => {
-      if (!appliedPlaceFilter.trim()) {
-        return true;
-      }
-
-      const normalizedQuery = appliedPlaceFilter.trim().toLowerCase();
-      return item.place.toLowerCase().includes(normalizedQuery)
-        || item.placeTags.some((tag) => tag.toLowerCase().includes(normalizedQuery));
-    })
-    .filter((item) => !appliedDateFrom || item.date >= appliedDateFrom)
-    .filter((item) => !appliedDateTo || item.date <= appliedDateTo)
-    .filter((item) => appliedAccessTypeFilter ? item.accessType === appliedAccessTypeFilter : true)
-    .sort((left, right) => sortItems(left, right, sortMode));
-
-  const normalizedSearchQuery = appliedSearchQuery.trim().toLowerCase();
-  const memorySearchResults = normalizedSearchQuery
-    ? items.filter((item) => {
-        const textForSearch = [
-          item.title,
-          item.text,
-          ...item.emotionTags,
-          ...item.placeTags,
-          ...item.customTags,
-        ].join(" ").toLowerCase();
-
-        return textForSearch.includes(normalizedSearchQuery);
-      })
-    : [];
 
   if (error) {
     return (
@@ -376,39 +251,33 @@ export default function MemoriesList() {
         </button>
       </div>
 
-      {showCategoriesPanel && (
-        <section className="card sectionCard floatingPanel">
-          <div className="sectionHeader">
-            <div>
-              <div className="sectionTitle">Категории</div>
-              <div className="sectionText">Создавайте, переименовывайте и удаляйте категории для организации архива.</div>
-            </div>
-          </div>
-          <div className="categoryCreateRow">
-            <input
-              className={`input ${categoryError ? "inputError" : ""}`}
-              placeholder="Новая категория"
-              value={categoryName}
-              onChange={(e) => setCategoryName(e.target.value)}
-              maxLength={MEMORY_CATEGORY_MAX}
-            />
-            <button className="btnPrimary" type="button" onClick={() => void handleCreateCategory()}>
-              Создать
-            </button>
-          </div>
-          {categoryError && <div className="error">{categoryError}</div>}
-          <div className="categoryManagerList">
-            {categoryOptions.length > 0 ? categoryOptions.map((category) => (
-              <div className="categoryManagerItem" key={category}>
-                <span>{category}</span>
-                <div className="categoryManagerActions">
-                  <button className="btnSmall" type="button" onClick={() => void handleRenameCategory(category)}>Переименовать</button>
-                  <button className="btnSmallDanger" type="button" onClick={() => void handleDeleteCategory(category)}>Удалить</button>
-                </div>
-              </div>
-            )) : <div className="emptyState">Пока нет категорий. Можно создать первую выше.</div>}
-          </div>
-        </section>
+      {showCategoriesPanel && user && (
+        <ManageMemoryCategories
+          userId={user.uid}
+          categories={categories}
+          categoryOptions={categoryOptions}
+          onCategoriesChange={setCategories}
+          onCategoryRenamed={(previousCategory, nextCategory) => {
+            const renameInFilters = (filters: MemoryFilters) => (
+              filters.category === previousCategory
+                ? { ...filters, category: nextCategory }
+                : filters
+            );
+
+            setDraftFilters((prev) => renameInFilters(prev));
+            setAppliedFilters((prev) => renameInFilters(prev));
+          }}
+          onCategoryDeleted={(category) => {
+            const clearInFilters = (filters: MemoryFilters) => (
+              filters.category === category
+                ? { ...filters, category: "" }
+                : filters
+            );
+
+            setDraftFilters((prev) => clearInFilters(prev));
+            setAppliedFilters((prev) => clearInFilters(prev));
+          }}
+        />
       )}
 
       {showSearchPanel && (
@@ -425,7 +294,7 @@ export default function MemoriesList() {
                 className="input"
                 placeholder="Например, лето или Москва"
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
+                onChange={(event) => setSearchQuery(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key !== "Enter") {
                     return;
@@ -434,16 +303,7 @@ export default function MemoriesList() {
                   event.preventDefault();
                   const nextQuery = searchQuery.trim();
                   setAppliedSearchQuery(nextQuery);
-                  syncParams({
-                    search: nextQuery,
-                    category: appliedCategory,
-                    tag: appliedTagFilter,
-                    place: appliedPlaceFilter,
-                    dateFrom: appliedDateFrom,
-                    dateTo: appliedDateTo,
-                    access: appliedAccessTypeFilter,
-                    sort: sortMode,
-                  });
+                  syncCurrentState({ search: nextQuery });
                 }}
               />
             </div>
@@ -453,16 +313,7 @@ export default function MemoriesList() {
               onClick={() => {
                 const nextQuery = searchQuery.trim();
                 setAppliedSearchQuery(nextQuery);
-                syncParams({
-                  search: nextQuery,
-                  category: appliedCategory,
-                  tag: appliedTagFilter,
-                  place: appliedPlaceFilter,
-                  dateFrom: appliedDateFrom,
-                  dateTo: appliedDateTo,
-                  access: appliedAccessTypeFilter,
-                  sort: sortMode,
-                });
+                syncCurrentState({ search: nextQuery });
               }}
             >
               Искать
@@ -474,16 +325,7 @@ export default function MemoriesList() {
                 setSearchQuery("");
                 setAppliedSearchQuery("");
                 setUserResults([]);
-                syncParams({
-                  search: "",
-                  category: appliedCategory,
-                  tag: appliedTagFilter,
-                  place: appliedPlaceFilter,
-                  dateFrom: appliedDateFrom,
-                  dateTo: appliedDateTo,
-                  access: appliedAccessTypeFilter,
-                  sort: sortMode,
-                });
+                syncCurrentState({ search: "" });
               }}
             >
               Сбросить
@@ -493,162 +335,34 @@ export default function MemoriesList() {
       )}
 
       {showSortPanel && (
-        <section className="card sectionCard floatingPanel">
-          <div className="sectionHeader">
-            <div>
-              <div className="sectionTitle">Сортировка</div>
-              <div className="sectionText">Выберите один из шести вариантов отображения списка.</div>
-            </div>
-          </div>
-          <div className="sortPanelRow">
-            <div className="field sortPanelField">
-              <label className="label">Как сортировать</label>
-              <select
-                className="input"
-                value={sortMode}
-                onChange={(e) => {
-                  const nextSort = e.target.value as SortMode;
-                  setSortMode(nextSort);
-                  syncParams({
-                    search: appliedSearchQuery,
-                    category: appliedCategory,
-                    tag: appliedTagFilter,
-                    place: appliedPlaceFilter,
-                    dateFrom: appliedDateFrom,
-                    dateTo: appliedDateTo,
-                    access: appliedAccessTypeFilter,
-                    sort: nextSort,
-                  });
-                }}
-              >
-                <option value="created-desc">По дате создания: новые сверху</option>
-                <option value="created-asc">По дате создания: старые сверху</option>
-                <option value="event-desc">По дате события: новые сверху</option>
-                <option value="event-asc">По дате события: старые сверху</option>
-                <option value="title-asc">По алфавиту: А-Я</option>
-                <option value="title-desc">По алфавиту: Я-А</option>
-              </select>
-            </div>
-            <button
-              className="btnSecondary"
-              type="button"
-              onClick={() => {
-                setSortMode(DEFAULT_SORT_MODE);
-                syncParams({
-                  search: appliedSearchQuery,
-                  category: appliedCategory,
-                  tag: appliedTagFilter,
-                  place: appliedPlaceFilter,
-                  dateFrom: appliedDateFrom,
-                  dateTo: appliedDateTo,
-                  access: appliedAccessTypeFilter,
-                  sort: DEFAULT_SORT_MODE,
-                });
-              }}
-            >
-              Сбросить сортировку
-            </button>
-          </div>
-        </section>
+        <MemorySortingPanel
+          sortMode={sortMode}
+          onChange={(nextSort) => {
+            setSortMode(nextSort);
+            syncCurrentState({ sort: nextSort });
+          }}
+          onReset={() => {
+            setSortMode(DEFAULT_MEMORY_SORT_MODE);
+            syncCurrentState({ sort: DEFAULT_MEMORY_SORT_MODE });
+          }}
+        />
       )}
 
       {showFiltersPanel && (
-        <section className="card sectionCard floatingPanel">
-          <div className="sectionHeader">
-            <div>
-              <div className="sectionTitle">Фильтры</div>
-              <div className="sectionText">Можно отобрать воспоминания по категории, тегам, месту, диапазону дат и типу доступа.</div>
-            </div>
-          </div>
-          <div className="filtersGrid">
-            <div className="field">
-              <label className="label">Категория</label>
-              <select className="input" value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-                <option value="">Все категории</option>
-                {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="label">Тег</label>
-              <input className="input" placeholder="Например, семья или море" value={tagFilter} onChange={(e) => setTagFilter(e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="label">Место</label>
-              <input className="input" placeholder="Например, Москва или парк" value={placeFilter} onChange={(e) => setPlaceFilter(e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="label">Тип доступа</label>
-              <select className="input" value={accessTypeFilter} onChange={(e) => setAccessTypeFilter(e.target.value)}>
-                <option value="">Все типы</option>
-                {MEMORY_ACCESS_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-              </select>
-            </div>
-            <div className="field">
-              <label className="label">Дата события: от</label>
-              <input className="input" type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
-            </div>
-            <div className="field">
-              <label className="label">Дата события: до</label>
-              <input className="input" type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
-            </div>
-          </div>
-          <div className="panelActions">
-            <button
-              className="btnPrimary"
-              type="button"
-              onClick={() => {
-                setAppliedCategory(selectedCategory);
-                setAppliedTagFilter(tagFilter);
-                setAppliedPlaceFilter(placeFilter);
-                setAppliedDateFrom(dateFrom);
-                setAppliedDateTo(dateTo);
-                setAppliedAccessTypeFilter(accessTypeFilter);
-                syncParams({
-                  search: appliedSearchQuery,
-                  category: selectedCategory,
-                  tag: tagFilter,
-                  place: placeFilter,
-                  dateFrom,
-                  dateTo,
-                  access: accessTypeFilter,
-                  sort: sortMode,
-                });
-              }}
-            >
-              Применить
-            </button>
-            <button
-              className="btnSecondary"
-              type="button"
-              onClick={() => {
-                setSelectedCategory("");
-                setTagFilter("");
-                setPlaceFilter("");
-                setDateFrom("");
-                setDateTo("");
-                setAccessTypeFilter("");
-                setAppliedCategory("");
-                setAppliedTagFilter("");
-                setAppliedPlaceFilter("");
-                setAppliedDateFrom("");
-                setAppliedDateTo("");
-                setAppliedAccessTypeFilter("");
-                syncParams({
-                  search: appliedSearchQuery,
-                  category: "",
-                  tag: "",
-                  place: "",
-                  dateFrom: "",
-                  dateTo: "",
-                  access: "",
-                  sort: sortMode,
-                });
-              }}
-            >
-              Сбросить фильтры
-            </button>
-          </div>
-        </section>
+        <MemoryFiltersPanel
+          categoryOptions={categoryOptions}
+          draftFilters={draftFilters}
+          onChange={setDraftFilters}
+          onApply={() => {
+            setAppliedFilters(draftFilters);
+            syncCurrentState({ filters: draftFilters });
+          }}
+          onReset={() => {
+            setDraftFilters(EMPTY_FILTERS);
+            setAppliedFilters(EMPTY_FILTERS);
+            syncCurrentState({ filters: EMPTY_FILTERS });
+          }}
+        />
       )}
 
       {appliedSearchQuery && (
@@ -773,7 +487,6 @@ export default function MemoriesList() {
                   >
                     Редактировать
                   </button>
-
                   <button
                     className="btnSmallDanger"
                     onClick={() => void onDelete(item.id)}
@@ -810,34 +523,6 @@ function TagRow({ label, tags, tone }: { label: string; tags: string[]; tone?: "
   );
 }
 
-function sortItems(left: NormalizedMemory, right: NormalizedMemory, sortMode: SortMode) {
-  switch (sortMode) {
-    case "created-asc":
-      return compareDates(left.createdAt, right.createdAt);
-    case "event-desc":
-      return compareStrings(right.date, left.date);
-    case "event-asc":
-      return compareStrings(left.date, right.date);
-    case "title-asc":
-      return compareStrings(left.title, right.title);
-    case "title-desc":
-      return compareStrings(right.title, left.title);
-    case "created-desc":
-    default:
-      return compareDates(right.createdAt, left.createdAt);
-  }
-}
-
-function compareDates(left: Date | null, right: Date | null) {
-  const leftValue = left?.getTime() ?? 0;
-  const rightValue = right?.getTime() ?? 0;
-  return leftValue - rightValue;
-}
-
-function compareStrings(left: string, right: string) {
-  return left.localeCompare(right, "ru");
-}
-
 function formatDate(date: string) {
   if (!date) return "не указано";
   const [year, month, day] = date.split("-");
@@ -860,24 +545,7 @@ function formatCreatedAt(date: Date | null) {
 }
 
 function getAccessTypeLabel(value: string) {
-  return MEMORY_ACCESS_TYPES.find((option) => option.value === value)?.label ?? "Приватное";
-}
-
-function parseCategoryError(error: unknown, fallback: string) {
-  if (error instanceof Error && error.message.startsWith("CATEGORY_EXISTS:")) {
-    return `Похожая категория уже есть: ${error.message.replace("CATEGORY_EXISTS:", "")}`;
-  }
-
-  return getErrorMessage(error, fallback);
-}
-
-function getMemoryPreview(item: NormalizedMemory) {
-  const firstTag = getAllTags(item)[0];
-  const parts = [item.text.trim(), firstTag ? `Тег: ${firstTag}` : "", item.place ? `Место: ${item.place}` : ""]
-    .filter(Boolean)
-    .join(" • ");
-
-  return parts || "Краткое превью недоступно";
+  return value === "public" ? "Публичное" : value === "shared" ? "По ссылке / совместное" : "Приватное";
 }
 
 function renderHighlightedText(text: string, query: string) {

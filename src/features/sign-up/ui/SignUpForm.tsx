@@ -5,7 +5,7 @@ import { doc, serverTimestamp, setDoc } from "firebase/firestore";
 import { Link, useNavigate } from "react-router-dom";
 import { auth, db } from "../../../shared/api/firebase/firebase";
 import { getAuthErrorMessage, getErrorMessage } from "../../../shared/lib/firebase-errors";
-import { reserveUsername } from "../../../shared/lib/usernames";
+import { reserveUsername } from "../../../entities/user";
 import {
   hasValidationErrors,
   normalizeUsername,
