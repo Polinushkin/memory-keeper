@@ -1,18 +1,19 @@
 import { useEffect, useMemo, useState } from "react";
 import {
   collection,
-  deleteDoc,
-  doc,
   onSnapshot,
   query,
   where,
 } from "firebase/firestore";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useLocation, useNavigate, useSearchParams } from "react-router-dom";
 import {
   applyMemoryFilters,
+  canUserEditMemory,
   DEFAULT_MEMORY_SORT_MODE,
+  deleteMemoryById,
   getMemoryPreview,
   getUserCategories,
+  MEMORY_ACCESS_TYPES,
   normalizeMemory,
   searchMemoriesByQuery,
   sortMemories,
@@ -37,8 +38,23 @@ const EMPTY_FILTERS: MemoryFilters = {
   accessType: "",
 };
 
-export default function MemoriesList() {
+type MemoriesListScope = "owned" | "shared" | "publicProfile";
+
+type MemoriesListProps = {
+  scope?: MemoriesListScope;
+  ownerId?: string;
+  ownerUsernameOverride?: string;
+  emptyText?: string;
+};
+
+export default function MemoriesList({
+  scope = "owned",
+  ownerId,
+  ownerUsernameOverride = "",
+  emptyText,
+}: MemoriesListProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user } = useAuth();
   const [searchParams, setSearchParams] = useSearchParams();
 
@@ -73,34 +89,63 @@ export default function MemoriesList() {
   const [appliedFilters, setAppliedFilters] = useState<MemoryFilters>(initialFilters);
   const [sortMode, setSortMode] = useState<MemorySortMode>(initialSort);
 
+  const showCategoryManager = scope === "owned";
+  const showUserSearch = scope === "owned";
+
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      return;
+    }
+
+    if (scope === "publicProfile" && !ownerId) {
+      setItems([]);
+      setLoading(false);
+      setError("Профиль пользователя не найден");
+      return;
+    }
 
     setLoading(true);
+    setError(null);
 
-    void getUserCategories(user.uid)
-      .then(setCategories)
-      .catch(() => setCategories([]));
+    if (showCategoryManager) {
+      void getUserCategories(user.uid)
+        .then(setCategories)
+        .catch(() => setCategories([]));
+    } else {
+      setCategories([]);
+    }
 
-    const memoriesQuery = query(collection(db, "memories"), where("ownerId", "==", user.uid));
+    const baseCollection = collection(db, "memories");
+    const memoriesQuery = scope === "shared"
+      ? query(baseCollection, where("sharedUserIds", "array-contains", user.uid))
+      : scope === "publicProfile"
+        ? query(baseCollection, where("ownerId", "==", ownerId), where("accessType", "==", "public"))
+        : query(baseCollection, where("ownerId", "==", user.uid));
 
     const unsubscribe = onSnapshot(
       memoriesQuery,
       (snapshot) => {
-        setItems(snapshot.docs.map((item) => normalizeMemory(item.id, item.data())));
+        const nextItems = snapshot.docs
+          .map((item) => normalizeMemory(item.id, item.data()))
+          .filter((item) => (
+            scope !== "shared" || (item.ownerId !== user.uid && item.accessType === "shared")
+          ));
+
+        setItems(nextItems);
         setLoading(false);
       },
-      (snapshotError) => {
-        setError(snapshotError?.message ?? "Не удалось загрузить воспоминания");
+      () => {
+        setItems([]);
+        setError(getScopeError(scope));
         setLoading(false);
       }
     );
 
     return () => unsubscribe();
-  }, [user]);
+  }, [ownerId, scope, showCategoryManager, user]);
 
   useEffect(() => {
-    if (!user || !appliedSearchQuery.trim()) {
+    if (!showUserSearch || !user || !appliedSearchQuery.trim()) {
       setUserResults([]);
       return;
     }
@@ -119,33 +164,20 @@ export default function MemoriesList() {
     }
 
     void loadUsers();
-  }, [appliedSearchQuery, user]);
+  }, [appliedSearchQuery, showUserSearch, user]);
 
   const categoryOptions = useMemo(() => (
     Array.from(new Set([...categories, ...items.map((item) => item.category).filter(Boolean)]))
       .sort((left, right) => left.localeCompare(right, "ru"))
   ), [categories, items]);
 
-  const currentListQueryString = useMemo(() => {
-    const next = new URLSearchParams();
-    if (appliedSearchQuery) next.set("search", appliedSearchQuery);
-    if (appliedFilters.category) next.set("category", appliedFilters.category);
-    if (appliedFilters.tag) next.set("tag", appliedFilters.tag);
-    if (appliedFilters.place) next.set("place", appliedFilters.place);
-    if (appliedFilters.dateFrom) next.set("dateFrom", appliedFilters.dateFrom);
-    if (appliedFilters.dateTo) next.set("dateTo", appliedFilters.dateTo);
-    if (appliedFilters.accessType) next.set("access", appliedFilters.accessType);
-    if (sortMode !== DEFAULT_MEMORY_SORT_MODE) next.set("sort", sortMode);
-    return next.toString();
-  }, [appliedFilters, appliedSearchQuery, sortMode]);
-
   const filteredItems = useMemo(() => (
     sortMemories(applyMemoryFilters(items, appliedFilters), sortMode)
-  ), [items, appliedFilters, sortMode]);
+  ), [appliedFilters, items, sortMode]);
 
   const memorySearchResults = useMemo(() => (
     searchMemoriesByQuery(items, appliedSearchQuery)
-  ), [items, appliedSearchQuery]);
+  ), [appliedSearchQuery, items]);
 
   function syncParams(next: {
     search?: string;
@@ -169,22 +201,6 @@ export default function MemoriesList() {
     setSearchParams(params);
   }
 
-  async function onDelete(id: string) {
-    const confirmed = window.confirm("Удалить это воспоминание?");
-    if (!confirmed) return;
-
-    setBusyId(id);
-    setError(null);
-
-    try {
-      await deleteDoc(doc(db, "memories", id));
-    } catch (deleteError: unknown) {
-      setError(getErrorMessage(deleteError, "Не удалось удалить воспоминание"));
-    } finally {
-      setBusyId(null);
-    }
-  }
-
   function syncCurrentState(next: {
     search?: string;
     filters?: MemoryFilters;
@@ -206,10 +222,26 @@ export default function MemoriesList() {
     });
   }
 
+  async function onDelete(id: string) {
+    const confirmed = window.confirm("Удалить это воспоминание?");
+    if (!confirmed) return;
+
+    setBusyId(id);
+    setError(null);
+
+    try {
+      await deleteMemoryById(id);
+    } catch (deleteError: unknown) {
+      setError(getErrorMessage(deleteError, "Не удалось удалить воспоминание"));
+    } finally {
+      setBusyId(null);
+    }
+  }
+
   if (error) {
     return (
       <div className="card" style={{ marginTop: 16 }}>
-        <div className="error">{error}</div>
+        <div className="emptyState">{error}</div>
       </div>
     );
   }
@@ -218,16 +250,21 @@ export default function MemoriesList() {
     return <div className="card">Загрузка...</div>;
   }
 
+  const listReturnTo = `${location.pathname}${location.search}`;
+  const resolvedEmptyText = emptyText ?? getEmptyText(scope);
+
   return (
     <div className="memoriesLayout">
       <div className="toolbarRow">
-        <button
-          type="button"
-          className={`panelToggle ${showCategoriesPanel ? "panelToggleActive" : ""}`}
-          onClick={() => setShowCategoriesPanel((value) => !value)}
-        >
-          Категории
-        </button>
+        {showCategoryManager && (
+          <button
+            type="button"
+            className={`panelToggle ${showCategoriesPanel ? "panelToggleActive" : ""}`}
+            onClick={() => setShowCategoriesPanel((value) => !value)}
+          >
+            Категории
+          </button>
+        )}
         <button
           type="button"
           className={`panelToggle ${showSearchPanel ? "panelToggleActive" : ""}`}
@@ -251,7 +288,7 @@ export default function MemoriesList() {
         </button>
       </div>
 
-      {showCategoriesPanel && user && (
+      {showCategoryManager && showCategoriesPanel && user && (
         <ManageMemoryCategories
           userId={user.uid}
           categories={categories}
@@ -285,7 +322,11 @@ export default function MemoriesList() {
           <div className="sectionHeader">
             <div>
               <div className="sectionTitle">Поиск</div>
-              <div className="sectionText">Поиск по воспоминаниям выполняется по заголовку, тексту и тегам, поиск пользователей - по username.</div>
+              <div className="sectionText">
+                {showUserSearch
+                  ? "Поиск по воспоминаниям идет по заголовку, тексту и тегам, по пользователям - по username."
+                  : "Поиск идет по заголовку, тексту и тегам внутри текущего списка воспоминаний."}
+              </div>
             </div>
           </div>
           <div className="searchPanelRow">
@@ -386,9 +427,14 @@ export default function MemoriesList() {
                       <div className="searchResultMeta">
                         <span>{item.category || "Без категории"}</span>
                         <span>{formatDate(item.date)}</span>
+                        {item.ownerUsername && <span>@{item.ownerUsername}</span>}
                       </div>
                     </div>
-                    <button className="btnSmall" type="button" onClick={() => navigate(`/memories/${item.id}${currentListQueryString ? `?${currentListQueryString}` : ""}`)}>
+                    <button
+                      className="btnSmall"
+                      type="button"
+                      onClick={() => navigate(`/memories/${item.id}?returnTo=${encodeURIComponent(listReturnTo)}`)}
+                    >
                       Открыть
                     </button>
                   </div>
@@ -399,105 +445,141 @@ export default function MemoriesList() {
             )}
           </div>
 
-          <div className="searchResultsSection">
-            <div className="searchResultsTitle">Пользователи</div>
-            {searchingUsers ? (
-              <div className="emptyState">Ищем пользователей...</div>
-            ) : userResults.length > 0 ? (
-              <div className="searchResultsList">
-                {userResults.map((item) => (
-                  <div className="searchResultItem" key={`user-${item.id}`}>
-                    <div className="searchUserIdentity">
-                      {item.avatarDataUrl ? (
-                        <img className="searchUserAvatar" src={item.avatarDataUrl} alt={item.username} />
-                      ) : (
-                        <div className="searchUserAvatarPlaceholder">{item.username.slice(0, 1).toUpperCase()}</div>
-                      )}
-                      <div className="searchResultBody">
-                        <div className="searchResultTitle">@{renderHighlightedText(item.username, appliedSearchQuery)}</div>
-                        <div className="searchResultPreview">{item.description || "Пользователь найден"}</div>
+          {showUserSearch && (
+            <div className="searchResultsSection">
+              <div className="searchResultsTitle">Пользователи</div>
+              {searchingUsers ? (
+                <div className="emptyState">Ищем пользователей...</div>
+              ) : userResults.length > 0 ? (
+                <div className="searchResultsList">
+                  {userResults.map((item) => (
+                    <button
+                      type="button"
+                      className="searchResultItem searchResultButton"
+                      key={`user-${item.id}`}
+                      onClick={() => navigate(`/users/${item.id}`)}
+                    >
+                      <div className="searchUserIdentity">
+                        {item.avatarDataUrl ? (
+                          <img className="searchUserAvatar" src={item.avatarDataUrl} alt={item.username} />
+                        ) : (
+                          <div className="searchUserAvatarPlaceholder">{item.username.slice(0, 1).toUpperCase()}</div>
+                        )}
+                        <div className="searchResultBody">
+                          <div className="searchResultTitle">@{renderHighlightedText(item.username, appliedSearchQuery)}</div>
+                          <div className="searchResultPreview">{item.description || "Открыть профиль пользователя"}</div>
+                        </div>
                       </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="emptyState">Пользователи по username не найдены.</div>
-            )}
-          </div>
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="emptyState">Пользователи по username не найдены.</div>
+              )}
+            </div>
+          )}
         </section>
       )}
 
       {filteredItems.length === 0 ? (
         <div className="card emptyState" style={{ textAlign: "center" }}>
           {items.length === 0
-            ? "У вас пока нет воспоминаний. Создайте первое, чтобы начать вести архив."
+            ? resolvedEmptyText
             : "По выбранным фильтрам ничего не найдено. Попробуйте изменить условия поиска."}
         </div>
       ) : (
         <div className="grid">
-          {filteredItems.map((item) => (
-            <div className="memoryCard" key={item.id}>
-              {item.photos?.[0]?.dataUrl && (
-                <div className="memoryPhotoWrap">
-                  <img
-                    className="memoryPhoto"
-                    src={item.photos[0].dataUrl}
-                    alt={item.photos[0].name || item.title}
-                  />
-                  {item.photos.length > 1 && (
-                    <div className="memoryPhotoCount">+{item.photos.length - 1}</div>
-                  )}
+          {filteredItems.map((item) => {
+            const canEdit = user ? canUserEditMemory(item, user.uid) : false;
+            const isOwner = Boolean(user && item.ownerId === user.uid);
+
+            return (
+              <div className="memoryCard" key={item.id}>
+                {item.photos?.[0]?.dataUrl && (
+                  <div className="memoryPhotoWrap">
+                    <img
+                      className="memoryPhoto"
+                      src={item.photos[0].dataUrl}
+                      alt={item.photos[0].name || item.title}
+                    />
+                    {item.photos.length > 1 && (
+                      <div className="memoryPhotoCount">+{item.photos.length - 1}</div>
+                    )}
+                  </div>
+                )}
+                <div className="memoryCardTop">
+                  {item.category && <span className="pillBadge">{item.category}</span>}
+                  <span className="pillBadge pillBadgeMuted">{getAccessTypeLabel(item.accessType)}</span>
                 </div>
-              )}
-              <div className="memoryCardTop">
-                {item.category && <span className="pillBadge">{item.category}</span>}
-                <span className="pillBadge pillBadgeMuted">{getAccessTypeLabel(item.accessType)}</span>
-              </div>
               <div className="memoryMain">
-                <div className="memoryTitle">{item.title}</div>
-                {item.text && <div className="memoryText">{item.text}</div>}
+                  <div className="memoryTitle">{item.title}</div>
+                  {item.text && <div className="memoryText">{item.text}</div>}
 
-                <div className="memoryDetails">
-                  {item.place ? <div className="memoryInlineMeta">Место: {item.place}</div> : <div className="memoryInlineMeta memoryInlineMetaEmpty" />}
-                  {item.emotionTags.length > 0 ? <TagRow label="Эмоции" tags={item.emotionTags} tone="emotion" /> : <div className="tagRow tagRowEmpty" />}
-                  {item.placeTags.length > 0 ? <TagRow label="Места" tags={item.placeTags} /> : <div className="tagRow tagRowEmpty" />}
-                  {item.customTags.length > 0 ? <TagRow label="Теги" tags={item.customTags} /> : <div className="tagRow tagRowEmpty" />}
+                  <div className="memoryDetails">
+                    {scope !== "owned" && (
+                      <div className="memoryInlineMeta">
+                        Автор:{" "}
+                        {item.ownerId ? (
+                          <button
+                            type="button"
+                            className="inlineLinkButton"
+                            onClick={() => navigate(item.ownerId === user?.uid ? "/profile" : `/users/${item.ownerId}`)}
+                          >
+                            {item.ownerUsername
+                              ? `@${item.ownerUsername}`
+                              : ownerUsernameOverride
+                                ? `@${ownerUsernameOverride}`
+                                : "профиль"}
+                          </button>
+                        ) : (
+                          "не указан"
+                        )}
+                      </div>
+                    )}
+                    {item.place ? <div className="memoryInlineMeta">Место: {item.place}</div> : <div className="memoryInlineMeta memoryInlineMetaEmpty" />}
+                    {item.emotionTags.length > 0 ? <TagRow label="Эмоции" tags={item.emotionTags} tone="emotion" /> : <div className="tagRow tagRowEmpty" />}
+                    {item.placeTags.length > 0 ? <TagRow label="Места" tags={item.placeTags} /> : <div className="tagRow tagRowEmpty" />}
+                    {item.customTags.length > 0 ? <TagRow label="Теги" tags={item.customTags} /> : <div className="tagRow tagRowEmpty" />}
+                  </div>
+                </div>
+
+                <div className="memoryFooter">
+                  <div className="memoryDateGroup">
+                    <div className="memoryDate">Событие: {formatDate(item.date)}</div>
+                    <div className="memoryDate">Создано: {formatCreatedAt(item.createdAt)}</div>
+                  </div>
+
+                  <div className="cardActions">
+                    <button
+                      className="btnSmall btnIcon"
+                      title="Просмотреть"
+                      onClick={() => navigate(`/memories/${item.id}?returnTo=${encodeURIComponent(listReturnTo)}`)}
+                    >
+                      ↗
+                    </button>
+                    {canEdit && (
+                      <button
+                        className="btnSmall"
+                        onClick={() => navigate(`/memories/${item.id}/edit?returnTo=${encodeURIComponent(listReturnTo)}`)}
+                        disabled={busyId === item.id}
+                      >
+                        Редактировать
+                      </button>
+                    )}
+                    {isOwner && (
+                      <button
+                        className="btnSmallDanger"
+                        onClick={() => void onDelete(item.id)}
+                        disabled={busyId === item.id}
+                      >
+                        {busyId === item.id ? "..." : "Удалить"}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-
-              <div className="memoryFooter">
-                <div className="memoryDateGroup">
-                  <div className="memoryDate">Событие: {formatDate(item.date)}</div>
-                  <div className="memoryDate">Создано: {formatCreatedAt(item.createdAt)}</div>
-                </div>
-
-                <div className="cardActions">
-                  <button
-                    className="btnSmall btnIcon"
-                    title="Просмотреть"
-                    onClick={() => navigate(`/memories/${item.id}${currentListQueryString ? `?${currentListQueryString}` : ""}`)}
-                  >
-                    ↗
-                  </button>
-                  <button
-                    className="btnSmall"
-                    onClick={() => navigate(`/memories/${item.id}/edit${currentListQueryString ? `?returnTo=${encodeURIComponent(`/memories/${item.id}?${currentListQueryString}`)}` : ""}`)}
-                    disabled={busyId === item.id}
-                  >
-                    Редактировать
-                  </button>
-                  <button
-                    className="btnSmallDanger"
-                    onClick={() => void onDelete(item.id)}
-                    disabled={busyId === item.id}
-                  >
-                    {busyId === item.id ? "..." : "Удалить"}
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -545,7 +627,7 @@ function formatCreatedAt(date: Date | null) {
 }
 
 function getAccessTypeLabel(value: string) {
-  return value === "public" ? "Публичное" : value === "shared" ? "По ссылке / совместное" : "Приватное";
+  return MEMORY_ACCESS_TYPES.find((option) => option.value === value)?.label ?? "Приватное";
 }
 
 function renderHighlightedText(text: string, query: string) {
@@ -564,4 +646,28 @@ function renderHighlightedText(text: string, query: string) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+}
+
+function getScopeError(scope: MemoriesListScope) {
+  if (scope === "shared") {
+    return "Пока не удалось загрузить доступные воспоминания. После обновления rules этот раздел должен открываться без технических ошибок.";
+  }
+
+  if (scope === "publicProfile") {
+    return "Не удалось загрузить публичные воспоминания этого пользователя.";
+  }
+
+  return "Не удалось загрузить ваши воспоминания.";
+}
+
+function getEmptyText(scope: MemoriesListScope) {
+  if (scope === "shared") {
+    return "Пока никто не открыл вам shared-воспоминания.";
+  }
+
+  if (scope === "publicProfile") {
+    return "У этого пользователя пока нет публичных воспоминаний.";
+  }
+
+  return "У вас пока нет воспоминаний. Создайте первое, чтобы начать вести архив.";
 }

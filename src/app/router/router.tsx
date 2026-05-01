@@ -9,6 +9,10 @@ import MemoryDetailsPage from "../../pages/memory-details-page/MemoryDetailsPage
 import ProfilePage from "../../pages/profile-page/ProfilePage";
 import CreateMemoryPage from "../../pages/create-memory-page/CreateMemoryPage";
 import EditMemoryPage from "../../pages/edit-memory-page/EditMemoryPage";
+import FriendsPage from "../../pages/friends-page/FriendsPage";
+import SharedMemoriesPage from "../../pages/shared-memories-page/SharedMemoriesPage";
+import UserProfilePage from "../../pages/user-profile-page/UserProfilePage";
+import UserPublicMemoriesPage from "../../pages/user-public-memories-page/UserPublicMemoriesPage";
 import NotFoundPage from "../../pages/not-found-page/NotFoundPage";
 
 export const router = createBrowserRouter([
@@ -60,10 +64,42 @@ export const router = createBrowserRouter([
         ),
       },
       {
+        path: "/friends",
+        element: (
+          <ProtectedRoute>
+            <FriendsPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/shared-memories",
+        element: (
+          <ProtectedRoute>
+            <SharedMemoriesPage />
+          </ProtectedRoute>
+        ),
+      },
+      {
         path: "/profile",
         element: (
           <ProtectedRoute>
             <ProfilePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/users/:userId",
+        element: (
+          <ProtectedRoute>
+            <UserProfilePage />
+          </ProtectedRoute>
+        ),
+      },
+      {
+        path: "/users/:userId/memories",
+        element: (
+          <ProtectedRoute>
+            <UserPublicMemoriesPage />
           </ProtectedRoute>
         ),
       },

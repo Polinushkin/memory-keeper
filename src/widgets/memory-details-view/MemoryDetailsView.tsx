@@ -1,26 +1,41 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { DeleteMemoryButton } from "../../features/delete-memory";
-import { getOwnedMemoryById, MEMORY_ACCESS_TYPES, type NormalizedMemory } from "../../entities/memory";
+import {
+  canUserCommentMemory,
+  canUserEditMemory,
+  createMemoryComment,
+  getAccessibleMemoryById,
+  MEMORY_ACCESS_TYPES,
+  subscribeToMemoryComments,
+  type NormalizedMemory,
+  type NormalizedMemoryComment,
+} from "../../entities/memory";
+import { getUserProfileById } from "../../entities/user";
 import { useAuth } from "../../app/providers/auth-provider/useAuth";
 import { getErrorMessage } from "../../shared/lib/firebase-errors";
+
+const MEMORY_COMMENT_MAX = 500;
 
 type MemoryDetailsViewProps = {
   memoryId: string;
   returnUrl: string;
-  returnQueryString: string;
 };
 
 export default function MemoryDetailsView({
   memoryId,
   returnUrl,
-  returnQueryString,
 }: MemoryDetailsViewProps) {
   const { user } = useAuth();
   const navigate = useNavigate();
   const [memory, setMemory] = useState<NormalizedMemory | null>(null);
+  const [comments, setComments] = useState<NormalizedMemoryComment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [commentsLoading, setCommentsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [commentsError, setCommentsError] = useState<string | null>(null);
+  const [commentText, setCommentText] = useState("");
+  const [commentSaving, setCommentSaving] = useState(false);
   const [photoIndex, setPhotoIndex] = useState(0);
 
   useEffect(() => {
@@ -32,7 +47,7 @@ export default function MemoryDetailsView({
       }
 
       try {
-        const nextMemory = await getOwnedMemoryById(memoryId, user.uid);
+        const nextMemory = await getAccessibleMemoryById(memoryId, user.uid);
         if (!nextMemory) {
           setError("Воспоминание не найдено");
           setLoading(false);
@@ -54,6 +69,78 @@ export default function MemoryDetailsView({
 
     void loadMemory();
   }, [memoryId, user]);
+
+  useEffect(() => {
+    if (!user || !memory) {
+      setComments([]);
+      setCommentsLoading(false);
+      return;
+    }
+
+    setCommentsLoading(true);
+    setCommentsError(null);
+
+    const unsubscribe = subscribeToMemoryComments(
+      memory.id,
+      (nextComments) => {
+        setComments(nextComments);
+        setCommentsLoading(false);
+      },
+      (loadError) => {
+        setComments([]);
+        setCommentsError(getErrorMessage(loadError, "Не удалось загрузить комментарии"));
+        setCommentsLoading(false);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [memory, user]);
+
+  const canEdit = useMemo(() => (
+    user && memory ? canUserEditMemory(memory, user.uid) : false
+  ), [memory, user]);
+
+  const canComment = useMemo(() => (
+    user && memory ? canUserCommentMemory(memory, user.uid) : false
+  ), [memory, user]);
+
+  const isOwner = Boolean(user && memory && memory.ownerId === user.uid);
+
+  async function handleCommentSubmit() {
+    if (!user || !memory) {
+      return;
+    }
+
+    const trimmed = commentText.trim();
+    if (!trimmed) {
+      setCommentsError("Введите текст комментария");
+      return;
+    }
+
+    if (trimmed.length > MEMORY_COMMENT_MAX) {
+      setCommentsError(`Комментарий должен быть не длиннее ${MEMORY_COMMENT_MAX} символов`);
+      return;
+    }
+
+    setCommentSaving(true);
+    setCommentsError(null);
+
+    try {
+      const profile = await getUserProfileById(user.uid);
+      await createMemoryComment({
+        memoryId: memory.id,
+        authorId: user.uid,
+        authorUsername: profile?.username ?? "",
+        authorAvatarDataUrl: profile?.avatarDataUrl ?? "",
+        text: trimmed,
+      });
+      setCommentText("");
+    } catch (saveError: unknown) {
+      setCommentsError(getErrorMessage(saveError, "Не удалось сохранить комментарий"));
+    } finally {
+      setCommentSaving(false);
+    }
+  }
 
   if (loading) {
     return <div className="card">Загрузка...</div>;
@@ -79,18 +166,22 @@ export default function MemoryDetailsView({
             Назад
           </button>
           <div className="memoryDetailsActions">
-            <button
-              type="button"
-              className="btnPrimary"
-              onClick={() => navigate(`/memories/${memory.id}/edit?returnTo=${encodeURIComponent(`/memories/${memory.id}${returnQueryString ? `?${returnQueryString}` : ""}`)}`)}
-            >
-              Редактировать
-            </button>
-            <DeleteMemoryButton
-              memoryId={memory.id}
-              onDeleted={() => navigate(returnUrl)}
-              onError={setError}
-            />
+            {canEdit && (
+              <button
+                type="button"
+                className="btnPrimary"
+                onClick={() => navigate(`/memories/${memory.id}/edit?returnTo=${encodeURIComponent(returnUrl)}`)}
+              >
+                Редактировать
+              </button>
+            )}
+            {isOwner && (
+              <DeleteMemoryButton
+                memoryId={memory.id}
+                onDeleted={() => navigate(returnUrl)}
+                onError={setError}
+              />
+            )}
           </div>
         </div>
 
@@ -144,6 +235,37 @@ export default function MemoryDetailsView({
         <h1 className="title">{memory.title}</h1>
         {memory.text && <div className="memoryDetailsText">{memory.text}</div>}
 
+        <div className="memoryDetailsBlock memoryDetailsMetaBlock">
+          <div className="memoryInlineMeta">
+            Автор:{" "}
+            {memory.ownerId ? (
+              <button
+                type="button"
+                className="inlineLinkButton"
+                onClick={() => navigate(user && memory.ownerId === user.uid ? "/profile" : `/users/${memory.ownerId}`)}
+              >
+                {memory.ownerUsername ? `@${memory.ownerUsername}` : "профиль автора"}
+              </button>
+            ) : (
+              "не указан"
+            )}
+          </div>
+          <div className="memoryInlineMeta">Уровень доступа: {getAccessTypeLabel(memory.accessType)}</div>
+        </div>
+
+        {isOwner && memory.sharedWith.length > 0 && (
+          <div className="memoryDetailsBlock memoryDetailsMetaBlock">
+            <div className="memoryAccessSubtitle">Кому открыт доступ</div>
+            <div className="tagPreview">
+              {memory.sharedWith.map((share) => (
+                <span key={share.userId}>
+                  @{share.username} · {getShareRoleLabel(share.role)}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
+
         {memory.emotionTags.length > 0 && <DetailTagRow label="Эмоции" tags={memory.emotionTags} tone="emotion" />}
         {memory.placeTags.length > 0 && <DetailTagRow label="Места" tags={memory.placeTags} />}
         {memory.customTags.length > 0 && <DetailTagRow label="Теги" tags={memory.customTags} />}
@@ -152,6 +274,65 @@ export default function MemoryDetailsView({
           {memory.place && <div className="memoryInlineMeta">Место: {memory.place}</div>}
           <div className="memoryInlineMeta">Дата события: {formatDate(memory.date)}</div>
           <div className="memoryInlineMeta">Дата создания: {formatCreatedAt(memory.createdAt)}</div>
+        </div>
+
+        <div className="memoryDetailsBlock memoryDetailsCommentsBlock">
+          <div className="memoryAccessSubtitle">Комментарии</div>
+
+          {canComment ? (
+            <div className="memoryCommentComposer">
+              <textarea
+                className="textarea"
+                placeholder="Напишите комментарий"
+                value={commentText}
+                onChange={(event) => setCommentText(event.target.value)}
+                maxLength={MEMORY_COMMENT_MAX}
+                rows={3}
+              />
+              <div className="memoryCommentComposerFooter">
+                <div className="hint">{commentText.length}/{MEMORY_COMMENT_MAX}</div>
+                <button
+                  type="button"
+                  className="btnPrimary"
+                  onClick={() => void handleCommentSubmit()}
+                  disabled={commentSaving}
+                >
+                  {commentSaving ? "Сохраняем..." : "Отправить"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <div className="emptyState">Оставлять комментарии могут владелец и пользователи с правом comment/edit.</div>
+          )}
+
+          {commentsError && <div className="error">{commentsError}</div>}
+
+          {commentsLoading ? (
+            <div className="emptyState">Загрузка комментариев...</div>
+          ) : comments.length === 0 ? (
+            <div className="emptyState">Пока комментариев нет.</div>
+          ) : (
+            <div className="memoryCommentsList">
+              {comments.map((comment) => (
+                <div className="memoryCommentCard" key={comment.id}>
+                  {comment.authorAvatarDataUrl ? (
+                    <img className="memoryCommentAvatar" src={comment.authorAvatarDataUrl} alt={comment.authorUsername || "Автор"} />
+                  ) : (
+                    <div className="memoryCommentAvatarPlaceholder">
+                      {(comment.authorUsername || "?").slice(0, 1).toUpperCase()}
+                    </div>
+                  )}
+                  <div className="memoryCommentBody">
+                    <div className="memoryCommentHeader">
+                      <span className="memoryCommentAuthor">@{comment.authorUsername || "user"}</span>
+                      <span className="memoryCommentDate">{formatCreatedAt(comment.createdAt)}</span>
+                    </div>
+                    <div className="memoryCommentText">{comment.text}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
@@ -200,4 +381,16 @@ function formatCreatedAt(date: Date | null) {
 
 function getAccessTypeLabel(value: string) {
   return MEMORY_ACCESS_TYPES.find((option) => option.value === value)?.label ?? "Приватное";
+}
+
+function getShareRoleLabel(role: string) {
+  if (role === "edit") {
+    return "Редактирование";
+  }
+
+  if (role === "comment") {
+    return "Комментарий";
+  }
+
+  return "Просмотр";
 }

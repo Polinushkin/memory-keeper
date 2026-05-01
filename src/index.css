@@ -98,6 +98,16 @@ body {
   color: var(--secondary);
   font-weight: 600;
 }
+
+.inlineLinkButton {
+  border: none;
+  padding: 0;
+  background: transparent;
+  color: #9f1239;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
 .smallLink {
   text-align: center;
   color: var(--text);
@@ -619,6 +629,11 @@ body {
   font: inherit;
 }
 
+.accessTypeCard:disabled {
+  cursor: not-allowed;
+  opacity: 0.72;
+}
+
 .accessTypeCardActive {
   border-color: rgba(255, 77, 109, 0.45);
   background: rgba(255, 77, 109, 0.12);
@@ -736,6 +751,13 @@ body {
   background: rgba(255, 255, 255, 0.88);
 }
 
+.searchResultButton {
+  width: 100%;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+}
+
 .searchResultBody {
   display: grid;
   gap: 4px;
@@ -750,6 +772,8 @@ body {
 .searchResultPreview {
   color: rgba(17, 24, 39, 0.72);
   line-height: 1.45;
+  word-break: break-word;
+  overflow-wrap: anywhere;
 }
 
 .searchResultMeta {
@@ -789,6 +813,75 @@ body {
   gap: 20px;
   max-width: 920px;
   width: 100%;
+}
+
+.friendsLayout {
+  display: grid;
+  gap: 18px;
+}
+
+.friendsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.friendList {
+  display: grid;
+  gap: 12px;
+}
+
+.friendCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.friendCardBody {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  text-align: left;
+}
+
+.friendCardTitle {
+  font-weight: 700;
+}
+
+.friendCardMeta {
+  font-size: 12px;
+  color: rgba(17, 24, 39, 0.62);
+}
+
+.friendActionGroup {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.friendStateBadge {
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.08);
+  color: rgba(17, 24, 39, 0.72);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.friendStateBadgeAccent {
+  background: rgba(255, 77, 109, 0.14);
+  color: #9f1239;
+}
+
+.friendStateBadgeSuccess {
+  background: rgba(34, 197, 94, 0.16);
+  color: #166534;
 }
 
 .memoryDetailsHeader {
@@ -857,6 +950,251 @@ body {
   max-width: 720px;
   width: 100%;
   justify-self: center;
+}
+
+.memoryDetailsMetaBlock {
+  max-width: 720px;
+  width: 100%;
+  justify-self: center;
+}
+
+.memoryDetailsCommentsBlock {
+  max-width: 720px;
+  width: 100%;
+  justify-self: center;
+}
+
+.publicProfileCard {
+  max-width: 520px;
+  margin: 0 auto;
+}
+
+.publicProfileHeader {
+  display: flex;
+  gap: 18px;
+  align-items: flex-start;
+  justify-content: flex-start;
+}
+
+.publicProfileAvatar,
+.publicProfileAvatarPlaceholder {
+  width: 96px;
+  height: 96px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.publicProfileAvatarPlaceholder {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 77, 109, 0.12);
+  color: #9f1239;
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.publicProfileBody {
+  display: grid;
+  gap: 6px;
+  text-align: left;
+  min-width: 0;
+  flex: 1;
+}
+
+.publicProfileBody .sectionTitle,
+.publicProfileBody .sectionText {
+  max-width: 100%;
+  min-width: 0;
+  word-break: break-word;
+  overflow-wrap: anywhere;
+}
+
+.publicProfileActions {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.memoriesSections {
+  display: grid;
+  gap: 18px;
+}
+
+.memoryAccessSection {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.7);
+}
+
+.memoryAccessIntro {
+  display: grid;
+  gap: 4px;
+}
+
+.memoryAccessTitle,
+.memoryAccessSubtitle {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.memoryAccessText,
+.memoryAccessNotice,
+.memoryAccessFriendMeta,
+.memoryAccessGrantedMeta,
+.memoryAccessRoleText {
+  color: rgba(17, 24, 39, 0.72);
+  line-height: 1.45;
+}
+
+.memoryAccessFriendMeta {
+  word-break: break-word;
+  overflow-wrap: anywhere;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.memoryAccessNotice {
+  padding: 12px 14px;
+  border-radius: 14px;
+  background: rgba(17, 24, 39, 0.05);
+}
+
+.memoryAccessRoles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.memoryAccessRoleHint {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.memoryAccessRoleTitle {
+  font-weight: 700;
+}
+
+.memoryAccessGrantedList,
+.memoryAccessFriendsList {
+  display: grid;
+  gap: 10px;
+}
+
+.memoryAccessGrantedItem,
+.memoryAccessFriendCard {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  align-items: center;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.memoryAccessGrantedBody,
+.memoryAccessFriendBody {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  text-align: left;
+}
+
+.memoryAccessGrantedTitle,
+.memoryAccessFriendTitle {
+  font-weight: 700;
+}
+
+.memoryAccessFriendControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.memoryAccessRoleSelect {
+  min-width: 180px;
+}
+
+.memoryCommentComposer {
+  display: grid;
+  gap: 10px;
+}
+
+.memoryCommentComposerFooter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.memoryCommentsList {
+  display: grid;
+  gap: 12px;
+}
+
+.memoryCommentCard {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 14px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.memoryCommentAvatar,
+.memoryCommentAvatarPlaceholder {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+}
+
+.memoryCommentAvatarPlaceholder {
+  display: grid;
+  place-items: center;
+  background: rgba(255, 77, 109, 0.12);
+  color: #9f1239;
+  font-weight: 800;
+}
+
+.memoryCommentBody {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+
+.memoryCommentHeader {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.memoryCommentAuthor {
+  font-weight: 700;
+}
+
+.memoryCommentDate {
+  font-size: 12px;
+  color: rgba(17, 24, 39, 0.6);
+}
+
+.memoryCommentText {
+  line-height: 1.5;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 .memoryCarouselButton {
@@ -1003,7 +1341,9 @@ body {
   .grid { grid-template-columns: 1fr; }
   .filtersGrid,
   .accessTypeGrid,
-  .categoryCreateRow {
+  .categoryCreateRow,
+  .friendsGrid,
+  .memoryAccessRoles {
     grid-template-columns: 1fr;
   }
   .toolbarRow,
@@ -1019,11 +1359,19 @@ body {
   .categoryManagerItem,
   .topbar,
   .nav,
-  .sectionHeader {
+  .sectionHeader,
+  .publicProfileHeader {
     flex-direction: column;
     align-items: stretch;
   }
   .filePicker {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .memoryAccessGrantedItem,
+  .memoryAccessFriendCard,
+  .memoryAccessFriendControls,
+  .memoryCommentComposerFooter {
     flex-direction: column;
     align-items: stretch;
   }

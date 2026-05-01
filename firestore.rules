@@ -1,0 +1,264 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isCurrentUser(userId) {
+      return isSignedIn() && request.auth.uid == userId;
+    }
+
+    function isMemoryOwner() {
+      return isSignedIn() && resource.data.ownerId == request.auth.uid;
+    }
+
+    function isPublicMemory() {
+      return resource.data.accessType == "public";
+    }
+
+    function isSharedReader() {
+      return isSignedIn()
+        && request.auth.uid in resource.data.sharedUserIds;
+    }
+
+    function isSharedEditor() {
+      return isSignedIn() && (
+        (resource.data.sharedEditorIds is list && resource.data.sharedEditorIds.hasAny([request.auth.uid]))
+        || isListedEditor(resource.data.sharedWith)
+      );
+    }
+
+    function isSharedCommenter() {
+      return isSignedIn() && (
+        (resource.data.sharedCommenterIds is list && resource.data.sharedCommenterIds.hasAny([request.auth.uid]))
+        || isListedCommenter(resource.data.sharedWith)
+      );
+    }
+
+    function hasValidSharedFields(data) {
+      return (
+        data.accessType == "shared"
+        && data.sharedUserIds is list
+        && data.sharedWith is list
+        && (
+          !("sharedEditorIds" in data)
+          || data.sharedEditorIds is list
+        )
+        && (
+          !("sharedCommenterIds" in data)
+          || data.sharedCommenterIds is list
+        )
+      ) || (
+        data.accessType != "shared"
+        && (
+          !("sharedUserIds" in data)
+          || (
+            data.sharedUserIds is list
+            && data.sharedUserIds.size() == 0
+          )
+        )
+        && (
+          !("sharedWith" in data)
+          || (
+            data.sharedWith is list
+            && data.sharedWith.size() == 0
+          )
+        )
+        && (
+          !("sharedEditorIds" in data)
+          || (
+            data.sharedEditorIds is list
+            && data.sharedEditorIds.size() == 0
+          )
+        )
+        && (
+          !("sharedCommenterIds" in data)
+          || (
+            data.sharedCommenterIds is list
+            && data.sharedCommenterIds.size() == 0
+          )
+        )
+      );
+    }
+
+    function editorChangesOnlyAllowedFields() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+        "title",
+        "text",
+        "date",
+        "place",
+        "category",
+        "emotion",
+        "emotionTags",
+        "placeTags",
+        "customTags",
+        "photos",
+        "photoNames"
+      ]);
+    }
+
+    function canCommentMemoryData(data) {
+      return isSignedIn()
+        && (
+          data.ownerId == request.auth.uid
+          || (
+            data.accessType == "shared"
+            && (
+              (data.sharedCommenterIds is list && data.sharedCommenterIds.hasAny([request.auth.uid]))
+              || isListedCommenter(data.sharedWith)
+            )
+          )
+        );
+    }
+
+    function parentMemory(memoryId) {
+      return get(/databases/$(database)/documents/memories/$(memoryId));
+    }
+
+    function isListedEditor(sharedWith) {
+      return sharedWith is list && (
+        hasEditRoleAt(sharedWith, 0) || hasEditRoleAt(sharedWith, 1) || hasEditRoleAt(sharedWith, 2) ||
+        hasEditRoleAt(sharedWith, 3) || hasEditRoleAt(sharedWith, 4) || hasEditRoleAt(sharedWith, 5) ||
+        hasEditRoleAt(sharedWith, 6) || hasEditRoleAt(sharedWith, 7) || hasEditRoleAt(sharedWith, 8) ||
+        hasEditRoleAt(sharedWith, 9) || hasEditRoleAt(sharedWith, 10) || hasEditRoleAt(sharedWith, 11)
+      );
+    }
+
+    function isListedCommenter(sharedWith) {
+      return sharedWith is list && (
+        hasCommentRoleAt(sharedWith, 0) || hasCommentRoleAt(sharedWith, 1) || hasCommentRoleAt(sharedWith, 2) ||
+        hasCommentRoleAt(sharedWith, 3) || hasCommentRoleAt(sharedWith, 4) || hasCommentRoleAt(sharedWith, 5) ||
+        hasCommentRoleAt(sharedWith, 6) || hasCommentRoleAt(sharedWith, 7) || hasCommentRoleAt(sharedWith, 8) ||
+        hasCommentRoleAt(sharedWith, 9) || hasCommentRoleAt(sharedWith, 10) || hasCommentRoleAt(sharedWith, 11)
+      );
+    }
+
+    function hasEditRoleAt(sharedWith, index) {
+      return sharedWith.size() > index
+        && sharedWith[index].userId == request.auth.uid
+        && sharedWith[index].role == "edit";
+    }
+
+    function hasCommentRoleAt(sharedWith, index) {
+      return sharedWith.size() > index
+        && sharedWith[index].userId == request.auth.uid
+        && (
+          sharedWith[index].role == "comment"
+          || sharedWith[index].role == "edit"
+        );
+    }
+
+    function canReadMemory() {
+      return isMemoryOwner()
+        || isPublicMemory()
+        || isSharedReader();
+    }
+
+    match /users/{userId} {
+      allow create: if isCurrentUser(userId);
+      allow read: if isSignedIn();
+      allow update, delete: if isCurrentUser(userId);
+    }
+
+    match /usernames/{usernameLower} {
+      allow read: if true;
+
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid;
+
+      allow update, delete: if isSignedIn()
+        && resource.data.uid == request.auth.uid;
+    }
+
+    match /friendRequests/{requestId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.fromUserId == request.auth.uid
+        && request.resource.data.toUserId is string
+        && request.resource.data.toUserId != request.auth.uid
+        && request.resource.data.status == "pending";
+
+      allow update: if isSignedIn()
+        && resource.data.status == "pending"
+        && request.resource.data.fromUserId == resource.data.fromUserId
+        && request.resource.data.toUserId == resource.data.toUserId
+        && request.resource.data.fromUsername == resource.data.fromUsername
+        && request.resource.data.toUsername == resource.data.toUsername
+        && (
+          (
+            resource.data.fromUserId == request.auth.uid
+            && request.resource.data.status == "cancelled"
+          )
+          || (
+            resource.data.toUserId == request.auth.uid
+            && (
+              request.resource.data.status == "accepted"
+              || request.resource.data.status == "declined"
+            )
+          )
+        );
+
+      allow delete: if false;
+    }
+
+    match /friends/{friendshipId} {
+      allow read: if isSignedIn();
+
+      allow create: if isSignedIn()
+        && request.resource.data.userIds is list
+        && request.resource.data.userIds.size() == 2
+        && request.auth.uid in request.resource.data.userIds;
+
+      allow delete: if isSignedIn()
+        && resource.data.userIds is list
+        && request.auth.uid in resource.data.userIds;
+
+      allow update: if false;
+    }
+
+    match /memories/{memoryId} {
+      allow create: if isSignedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && hasValidSharedFields(request.resource.data);
+
+      allow read: if isSignedIn() && canReadMemory();
+      allow update: if (
+          isMemoryOwner()
+          && request.resource.data.ownerId == resource.data.ownerId
+          && hasValidSharedFields(request.resource.data)
+        ) || (
+          isSharedEditor()
+          && editorChangesOnlyAllowedFields()
+          && hasValidSharedFields(request.resource.data)
+        );
+      allow delete: if isMemoryOwner();
+
+      match /comments/{commentId} {
+        allow read: if isSignedIn() && (
+          parentMemory(memoryId).data.ownerId == request.auth.uid
+          || parentMemory(memoryId).data.accessType == "public"
+          || (
+            parentMemory(memoryId).data.sharedUserIds is list
+            && parentMemory(memoryId).data.sharedUserIds.hasAny([request.auth.uid])
+          )
+        );
+
+        allow create: if isSignedIn()
+          && canCommentMemoryData(parentMemory(memoryId).data)
+          && request.resource.data.authorId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0;
+
+        allow delete: if isSignedIn()
+          && (
+            request.auth.uid == resource.data.authorId
+            || parentMemory(memoryId).data.ownerId == request.auth.uid
+          );
+
+        allow update: if false;
+      }
+    }
+  }
+}

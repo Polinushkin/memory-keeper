@@ -3,8 +3,17 @@ import type { ChangeEvent, FormEvent } from "react";
 import { addDoc, collection, serverTimestamp } from "firebase/firestore";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../../../app/providers/auth-provider/useAuth";
+import { ManageMemoryAccess } from "../../../features/manage-memory-access";
 import { appendUserCategory, getUserCategories } from "../../../entities/memory/api/categories";
-import { findSimilarCategory, MEMORY_ACCESS_TYPES, parseTagInput } from "../../../entities/memory/model/memory";
+import { getUserProfileById } from "../../../entities/user";
+import {
+  buildMemoryAccessPayload,
+  findSimilarCategory,
+  MEMORY_ACCESS_TYPES,
+  parseTagInput,
+  validateSharedMemoryAccess,
+  type NormalizedMemoryShare,
+} from "../../../entities/memory/model/memory";
 import { db } from "../../../shared/api/firebase/firebase";
 import { getErrorMessage } from "../../../shared/lib/firebase-errors";
 import { getDataUrlSize, prepareImageForFirestore, type StoredImage } from "../../../shared/lib/images";
@@ -39,7 +48,8 @@ type MemoryField =
   | "emotionTags"
   | "placeTags"
   | "customTags"
-  | "photos";
+  | "photos"
+  | "sharedWith";
 
 export default function CreateMemoryForm() {
   const navigate = useNavigate();
@@ -55,6 +65,7 @@ export default function CreateMemoryForm() {
   const [placeTagsInput, setPlaceTagsInput] = useState("");
   const [customTagsInput, setCustomTagsInput] = useState("");
   const [accessType, setAccessType] = useState<"private" | "shared" | "public">("private");
+  const [sharedWith, setSharedWith] = useState<NormalizedMemoryShare[]>([]);
   const [photos, setPhotos] = useState<StoredImage[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -161,6 +172,7 @@ export default function CreateMemoryForm() {
       placeTags: validateMemoryTagList(placeTags, "Теги мест"),
       customTags: validateMemoryTagList(customTags, "Пользовательские теги"),
       photos: fieldErrors.photos || "",
+      sharedWith: validateSharedMemoryAccess(accessType, sharedWith),
     };
     setFieldErrors(nextErrors);
     if (hasValidationErrors(nextErrors)) return;
@@ -172,8 +184,12 @@ export default function CreateMemoryForm() {
         setCategories(nextCategories);
       }
 
+      const ownerProfile = await getUserProfileById(user.uid);
+      const accessPayload = buildMemoryAccessPayload(accessType, sharedWith);
+
       await addDoc(collection(db, "memories"), {
         ownerId: user.uid,
+        ownerUsername: ownerProfile?.username ?? "",
         title: title.trim(),
         text: text.trim(),
         date,
@@ -183,7 +199,7 @@ export default function CreateMemoryForm() {
         emotionTags,
         placeTags,
         customTags,
-        accessType,
+        ...accessPayload,
         photos,
         photoNames: photos.map((photo) => photo.name),
         createdAt: serverTimestamp(),
@@ -288,6 +304,21 @@ export default function CreateMemoryForm() {
               </button>
             ))}
           </div>
+        </div>
+
+        <div className="field">
+          {user && (
+            <ManageMemoryAccess
+              userId={user.uid}
+              accessType={accessType}
+              sharedWith={sharedWith}
+              error={fieldErrors.sharedWith}
+              onChange={(nextSharedWith) => {
+                setSharedWith(nextSharedWith);
+                setFieldErrors((prev) => ({ ...prev, sharedWith: "" }));
+              }}
+            />
+          )}
         </div>
 
         <div className="field">

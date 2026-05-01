@@ -19,6 +19,14 @@ export default function AppLayout() {
                 Мои воспоминания
               </NavLink>
 
+              <NavLink className="navBtn" to="/shared-memories">
+                Доступные воспоминания
+              </NavLink>
+
+              <NavLink className="navBtn" to="/friends">
+                Друзья
+              </NavLink>
+
               <NavLink className="navBtn" to="/profile">
                 Профиль
               </NavLink>

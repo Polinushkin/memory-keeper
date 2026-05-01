@@ -9,14 +9,12 @@ export default function MemoryDetailsPage() {
     return <Navigate to="/memories" replace />;
   }
 
-  const returnQueryString = searchParams.toString();
-  const returnUrl = returnQueryString ? `/memories?${returnQueryString}` : "/memories";
+  const returnTo = searchParams.get("returnTo") || "/memories";
 
   return (
     <MemoryDetailsView
       memoryId={id}
-      returnUrl={returnUrl}
-      returnQueryString={returnQueryString}
+      returnUrl={returnTo}
     />
   );
 }

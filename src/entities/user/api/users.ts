@@ -99,3 +99,32 @@ export async function searchUsersByUsername(username: string, currentUid?: strin
 
   return hydratedResults;
 }
+
+export async function getUserProfileById(userId: string) {
+  const [userSnapshot, usernameSnapshot] = await Promise.all([
+    getDoc(doc(db, "users", userId)),
+    getDocs(query(collection(db, "usernames"), where("uid", "==", userId), limit(1))),
+  ]);
+
+  if (!userSnapshot.exists() && usernameSnapshot.empty) {
+    return null;
+  }
+
+  const userData = userSnapshot.exists()
+    ? (userSnapshot.data() as UserProfileRow & { username?: string; usernameLower?: string })
+    : null;
+  const usernameData = !usernameSnapshot.empty ? (usernameSnapshot.docs[0].data() as UsernameRow) : null;
+  const username = String(userData?.username ?? usernameData?.username ?? "");
+
+  if (!username) {
+    return null;
+  }
+
+  return {
+    id: userId,
+    username,
+    usernameLower: normalizeUsername(String(userData?.usernameLower ?? usernameData?.usernameLower ?? username)),
+    description: String(userData?.description ?? usernameData?.description ?? ""),
+    avatarDataUrl: String(userData?.avatarDataUrl ?? usernameData?.avatarDataUrl ?? ""),
+  } satisfies UserSearchResult;
+}

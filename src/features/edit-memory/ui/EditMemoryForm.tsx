@@ -1,10 +1,15 @@
 import { useEffect, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
-import { doc, getDoc, updateDoc } from "firebase/firestore";
+import { doc, updateDoc } from "firebase/firestore";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import { useAuth } from "../../../app/providers/auth-provider/useAuth";
+import { ManageMemoryAccess } from "../../../features/manage-memory-access";
+import { getAccessibleMemoryById } from "../../../entities/memory";
 import { appendUserCategory, getUserCategories } from "../../../entities/memory/api/categories";
+import { getUserProfileById } from "../../../entities/user";
 import {
+  buildMemoryAccessPayload,
+  canUserEditMemory,
   MEMORY_ACCESS_TYPES,
   findSimilarCategory,
   getAccessType,
@@ -12,8 +17,10 @@ import {
   getCustomTags,
   getEmotionTags,
   getPlaceTags,
+  getSharedWith,
   parseTagInput,
-  type MemoryDocument,
+  validateSharedMemoryAccess,
+  type NormalizedMemoryShare,
 } from "../../../entities/memory/model/memory";
 import { db } from "../../../shared/api/firebase/firebase";
 import { getErrorMessage } from "../../../shared/lib/firebase-errors";
@@ -49,9 +56,8 @@ type MemoryField =
   | "emotionTags"
   | "placeTags"
   | "customTags"
-  | "photos";
-
-type MemoryRecord = MemoryDocument & { ownerId?: string };
+  | "photos"
+  | "sharedWith";
 
 export default function EditMemoryForm() {
   const { id } = useParams();
@@ -69,6 +75,11 @@ export default function EditMemoryForm() {
   const [placeTagsInput, setPlaceTagsInput] = useState("");
   const [customTagsInput, setCustomTagsInput] = useState("");
   const [accessType, setAccessType] = useState<"private" | "shared" | "public">("private");
+  const [sharedWith, setSharedWith] = useState<NormalizedMemoryShare[]>([]);
+  const [memoryOwnerId, setMemoryOwnerId] = useState("");
+  const [memoryOwnerUsername, setMemoryOwnerUsername] = useState("");
+  const [originalAccessType, setOriginalAccessType] = useState<"private" | "shared" | "public">("private");
+  const [originalSharedWith, setOriginalSharedWith] = useState<NormalizedMemoryShare[]>([]);
   const [photos, setPhotos] = useState<StoredImage[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -76,6 +87,7 @@ export default function EditMemoryForm() {
   const [fieldErrors, setFieldErrors] = useState<ValidationErrors<MemoryField>>({});
   const [draggedPhotoIndex, setDraggedPhotoIndex] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const isOwner = user?.uid === memoryOwnerId;
 
   useEffect(() => {
     async function loadMemory() {
@@ -92,36 +104,40 @@ export default function EditMemoryForm() {
       }
 
       try {
-        const [snapshot, userCategories] = await Promise.all([
-          getDoc(doc(db, "memories", id)),
+        const [memory, userCategories] = await Promise.all([
+          getAccessibleMemoryById(id, user.uid),
           getUserCategories(user.uid),
         ]);
 
         setCategories(userCategories);
 
-        if (!snapshot.exists()) {
+        if (!memory) {
           setError("Воспоминание не найдено");
           setLoading(false);
           return;
         }
 
-        const data = snapshot.data() as MemoryRecord;
-        if (data.ownerId !== user.uid) {
+        if (!canUserEditMemory(memory, user.uid)) {
           setError("Нет доступа к этому воспоминанию");
           setLoading(false);
           return;
         }
 
-        setTitle(typeof data.title === "string" ? data.title : "");
-        setText(typeof data.text === "string" ? data.text : "");
-        setDate(typeof data.date === "string" ? data.date : "");
-        setPlace(typeof data.place === "string" ? data.place : "");
-        setSelectedCategory(getCategory(data));
-        setEmotionTags(getEmotionTags(data));
-        setPlaceTagsInput(getPlaceTags(data).join(", "));
-        setCustomTagsInput(getCustomTags(data).join(", "));
-        setAccessType(getAccessType(data.accessType));
-        setPhotos(Array.isArray(data.photos) ? data.photos.filter((photo): photo is StoredImage => typeof photo?.name === "string" && typeof photo?.dataUrl === "string") : []);
+        setTitle(memory.title);
+        setText(memory.text);
+        setDate(memory.date);
+        setPlace(memory.place);
+        setMemoryOwnerId(memory.ownerId);
+        setMemoryOwnerUsername(memory.ownerUsername);
+        setSelectedCategory(getCategory(memory));
+        setEmotionTags(getEmotionTags(memory));
+        setPlaceTagsInput(getPlaceTags(memory).join(", "));
+        setCustomTagsInput(getCustomTags(memory).join(", "));
+        setAccessType(getAccessType(memory.accessType));
+        setOriginalAccessType(getAccessType(memory.accessType));
+        setSharedWith(getSharedWith(memory));
+        setOriginalSharedWith(getSharedWith(memory));
+        setPhotos(memory.photos.filter((photo): photo is StoredImage => typeof photo?.name === "string" && typeof photo?.dataUrl === "string"));
       } catch (err: unknown) {
         setError(getErrorMessage(err, "Не удалось загрузить воспоминание"));
       } finally {
@@ -215,6 +231,7 @@ export default function EditMemoryForm() {
       placeTags: validateMemoryTagList(placeTags, "Теги мест"),
       customTags: validateMemoryTagList(customTags, "Пользовательские теги"),
       photos: fieldErrors.photos || "",
+      sharedWith: validateSharedMemoryAccess(accessType, sharedWith),
     };
     setFieldErrors(nextErrors);
     if (hasValidationErrors(nextErrors)) return;
@@ -226,21 +243,46 @@ export default function EditMemoryForm() {
         setCategories(nextCategories);
       }
 
-      await updateDoc(doc(db, "memories", id), {
-        title: title.trim(),
-        text: text.trim(),
-        date,
-        place: place.trim(),
-        category: resolvedCategory.trim(),
-        emotion: emotionTags[0] ?? "",
-        emotionTags,
-        placeTags,
-        customTags,
-        accessType,
-        photos,
-        photoNames: photos.map((photo) => photo.name),
-      });
-      navigate("/memories");
+      let nextOwnerUsername = memoryOwnerUsername;
+      if (isOwner) {
+        const ownerProfile = await getUserProfileById(user.uid);
+        nextOwnerUsername = ownerProfile?.username ?? memoryOwnerUsername;
+      }
+
+      if (isOwner) {
+        const accessPayload = buildMemoryAccessPayload(accessType, sharedWith);
+
+        await updateDoc(doc(db, "memories", id), {
+          ownerUsername: nextOwnerUsername,
+          title: title.trim(),
+          text: text.trim(),
+          date,
+          place: place.trim(),
+          category: resolvedCategory.trim(),
+          emotion: emotionTags[0] ?? "",
+          emotionTags,
+          placeTags,
+          customTags,
+          ...accessPayload,
+          photos,
+          photoNames: photos.map((photo) => photo.name),
+        });
+      } else {
+        await updateDoc(doc(db, "memories", id), {
+          title: title.trim(),
+          text: text.trim(),
+          date,
+          place: place.trim(),
+          category: resolvedCategory.trim(),
+          emotion: emotionTags[0] ?? "",
+          emotionTags,
+          placeTags,
+          customTags,
+          photos,
+          photoNames: photos.map((photo) => photo.name),
+        });
+      }
+      navigate(returnTo || (isOwner ? "/memories" : "/shared-memories"));
     } catch (err: unknown) {
       if (err instanceof Error && err.message.startsWith("CATEGORY_EXISTS:")) {
         setFieldErrors((prev) => ({
@@ -336,13 +378,37 @@ export default function EditMemoryForm() {
                 key={option.value}
                 type="button"
                 className={`accessTypeCard ${accessType === option.value ? "accessTypeCardActive" : ""}`}
-                onClick={() => setAccessType(option.value)}
+                onClick={() => {
+                  if (!isOwner) {
+                    return;
+                  }
+
+                  setAccessType(option.value);
+                }}
+                disabled={!isOwner}
               >
                 <span className="accessTypeTitle">{option.label}</span>
                 <span className="accessTypeDescription">{option.description}</span>
               </button>
             ))}
           </div>
+          {!isOwner && <div className="hint">Менять тип доступа может только владелец воспоминания.</div>}
+        </div>
+
+        <div className="field">
+          {user && (
+            <ManageMemoryAccess
+              userId={user.uid}
+              accessType={isOwner ? accessType : originalAccessType}
+              sharedWith={isOwner ? sharedWith : originalSharedWith}
+              error={fieldErrors.sharedWith}
+              disabled={memoryOwnerId !== user.uid}
+              onChange={(nextSharedWith) => {
+                setSharedWith(nextSharedWith);
+                setFieldErrors((prev) => ({ ...prev, sharedWith: "" }));
+              }}
+            />
+          )}
         </div>
 
         <div className="field">

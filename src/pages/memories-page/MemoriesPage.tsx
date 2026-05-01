@@ -14,7 +14,7 @@ export default function MemoriesPage() {
         </button>
       </div>
 
-      <MemoriesList />
+      <MemoriesList scope="owned" />
     </div>
   );
 }
