@@ -10,6 +10,7 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../../shared/api/firebase/firebase";
+import { createFriendRequestNotification } from "../../notification";
 import { getUserProfileById } from "../../user";
 import {
   buildFriendshipId,
@@ -100,8 +101,9 @@ export async function sendFriendRequest(params: SendFriendRequestParams) {
     throw new Error("FRIEND_REQUEST_ALREADY_EXISTS");
   }
 
+  const nextRequestRef = doc(requestsRef);
+
   await runTransaction(db, async (transaction) => {
-    const nextRequestRef = doc(requestsRef);
     transaction.set(nextRequestRef, {
       fromUserId,
       toUserId,
@@ -111,6 +113,15 @@ export async function sendFriendRequest(params: SendFriendRequestParams) {
       createdAt: serverTimestamp(),
       respondedAt: null,
     });
+  });
+
+  const actorProfile = await getUserProfileById(fromUserId);
+  await createFriendRequestNotification({
+    userId: toUserId,
+    actorUserId: fromUserId,
+    actorUsername: params.fromUsername.trim(),
+    actorAvatarDataUrl: actorProfile?.avatarDataUrl ?? "",
+    friendRequestId: nextRequestRef.id,
   });
 }
 
@@ -226,6 +237,15 @@ export async function getFriendRequestState(currentUserId: string, targetUserId:
     type: "none" as const,
     request: null,
   };
+}
+
+export async function getFriendRequestById(requestId: string) {
+  const snapshot = await getDoc(doc(db, FRIEND_REQUESTS_COLLECTION, requestId));
+  if (!snapshot.exists()) {
+    return null;
+  }
+
+  return normalizeFriendRequest(snapshot.id, snapshot.data() as FriendRequestDocument);
 }
 
 async function findPendingFriendRequest(fromUserId: string, toUserId: string) {

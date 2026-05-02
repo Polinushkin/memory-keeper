@@ -100,14 +100,12 @@ service cloud.firestore {
 
     function canCommentMemoryData(data) {
       return isSignedIn()
+        && data.accessType == "shared"
         && (
           data.ownerId == request.auth.uid
           || (
-            data.accessType == "shared"
-            && (
-              (data.sharedCommenterIds is list && data.sharedCommenterIds.hasAny([request.auth.uid]))
-              || isListedCommenter(data.sharedWith)
-            )
+            (data.sharedCommenterIds is list && data.sharedCommenterIds.hasAny([request.auth.uid]))
+            || isListedCommenter(data.sharedWith)
           )
         );
     }
@@ -218,6 +216,38 @@ service cloud.firestore {
       allow update: if false;
     }
 
+    match /notifications/{notificationId} {
+      allow read: if isCurrentUser(resource.data.userId);
+
+      allow create: if isSignedIn()
+        && request.resource.data.userId is string
+        && (
+          (
+            request.resource.data.type == "friend_request"
+            && request.resource.data.actorUserId == request.auth.uid
+            && request.resource.data.friendRequestId is string
+            && request.resource.data.friendRequestId.size() > 0
+          )
+          || (
+            request.resource.data.type == "shared_memory"
+            && request.resource.data.actorUserId == request.auth.uid
+            && request.resource.data.memoryId is string
+            && request.resource.data.memoryId.size() > 0
+          )
+          || (
+            request.resource.data.type == "memory_of_day"
+            && request.resource.data.userId == request.auth.uid
+            && request.resource.data.memoryId is string
+            && request.resource.data.memoryId.size() > 0
+          )
+        );
+
+      allow update: if isCurrentUser(resource.data.userId)
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(["isRead"]);
+
+      allow delete: if false;
+    }
+
     match /memories/{memoryId} {
       allow create: if isSignedIn()
         && request.resource.data.ownerId == request.auth.uid
@@ -238,10 +268,12 @@ service cloud.firestore {
       match /comments/{commentId} {
         allow read: if isSignedIn() && (
           parentMemory(memoryId).data.ownerId == request.auth.uid
-          || parentMemory(memoryId).data.accessType == "public"
           || (
+            parentMemory(memoryId).data.accessType == "shared"
+            && (
             parentMemory(memoryId).data.sharedUserIds is list
             && parentMemory(memoryId).data.sharedUserIds.hasAny([request.auth.uid])
+          )
           )
         );
 

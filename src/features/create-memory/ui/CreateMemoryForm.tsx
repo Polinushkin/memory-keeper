@@ -6,6 +6,7 @@ import { useAuth } from "../../../app/providers/auth-provider/useAuth";
 import { ManageMemoryAccess } from "../../../features/manage-memory-access";
 import { appendUserCategory, getUserCategories } from "../../../entities/memory/api/categories";
 import { getUserProfileById } from "../../../entities/user";
+import { createSharedMemoryNotification } from "../../../entities/notification";
 import {
   buildMemoryAccessPayload,
   findSimilarCategory,
@@ -187,7 +188,7 @@ export default function CreateMemoryForm() {
       const ownerProfile = await getUserProfileById(user.uid);
       const accessPayload = buildMemoryAccessPayload(accessType, sharedWith);
 
-      await addDoc(collection(db, "memories"), {
+      const memoryRef = await addDoc(collection(db, "memories"), {
         ownerId: user.uid,
         ownerUsername: ownerProfile?.username ?? "",
         title: title.trim(),
@@ -204,6 +205,24 @@ export default function CreateMemoryForm() {
         photoNames: photos.map((photo) => photo.name),
         createdAt: serverTimestamp(),
       });
+
+      if (accessType === "shared") {
+        const preview = buildNotificationPreview(text, place, [...emotionTags, ...placeTags, ...customTags]);
+
+        await Promise.all(
+          accessPayload.sharedWith.map((item) => createSharedMemoryNotification({
+            userId: item.userId,
+            actorUserId: user.uid,
+            actorUsername: ownerProfile?.username ?? "",
+            actorAvatarDataUrl: ownerProfile?.avatarDataUrl ?? "",
+            memoryId: memoryRef.id,
+            memoryTitle: title.trim(),
+            memoryDate: date,
+            memoryPreview: preview,
+          }))
+        );
+      }
+
       navigate("/memories");
     } catch (err: unknown) {
       if (err instanceof Error && err.message.startsWith("CATEGORY_EXISTS:")) {
@@ -366,4 +385,22 @@ export default function CreateMemoryForm() {
       </form>
     </>
   );
+}
+
+function buildNotificationPreview(text: string, place: string, tags: string[]) {
+  const normalizedText = text.trim();
+  if (normalizedText) {
+    return normalizedText.slice(0, 120);
+  }
+
+  const firstTag = tags.find(Boolean);
+  if (firstTag) {
+    return `Тег: ${firstTag}`;
+  }
+
+  if (place.trim()) {
+    return `Место: ${place.trim()}`;
+  }
+
+  return "Совместное воспоминание стало доступно";
 }

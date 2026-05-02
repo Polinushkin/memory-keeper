@@ -1,6 +1,7 @@
 export {
   cancelFriendRequest,
   getFriendProfiles,
+  getFriendRequestById,
   getFriendRequestState,
   getIncomingFriendRequests,
   getOutgoingFriendRequests,

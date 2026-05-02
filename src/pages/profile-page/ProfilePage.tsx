@@ -1,11 +1,9 @@
-import UpdateProfileForm from "../../features/update-profile/ui/UpdateProfileForm";
+import { ProfileDashboard } from "../../widgets/profile-dashboard";
 
 export default function ProfilePage() {
   return (
-    <div className="page">
-      <div className="authCard">
-        <UpdateProfileForm />
-      </div>
+    <div className="pageWide">
+      <ProfileDashboard />
     </div>
   );
 }

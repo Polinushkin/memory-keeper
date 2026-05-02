@@ -50,6 +50,26 @@ body {
   font: inherit;
 }
 
+.navBtnWithBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.navBadge {
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #111827;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .page {
   display: grid;
   place-items: center;
@@ -820,6 +840,321 @@ body {
   gap: 18px;
 }
 
+.profileDashboard {
+  display: grid;
+  gap: 18px;
+}
+
+.notificationsList {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.notificationCard {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  padding: 16px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.notificationCardRead {
+  opacity: 0.78;
+}
+
+.notificationActionColumn {
+  display: grid;
+  gap: 10px;
+  justify-items: end;
+  flex-shrink: 0;
+}
+
+.notificationActionButton {
+  min-width: 132px;
+}
+
+.notificationActionSpacer {
+  min-width: 132px;
+  min-height: 34px;
+}
+
+.oldNotificationsSection {
+  display: grid;
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.oldNotificationsButton {
+  justify-self: start;
+  padding: 0 18px;
+}
+
+.notificationUnreadButton {
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 77, 109, 0.26);
+  border-radius: 50%;
+  background: rgba(255, 77, 109, 0.1);
+  color: #9f1239;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+}
+
+.notificationUnreadButton:hover {
+  background: rgba(255, 77, 109, 0.16);
+}
+
+.toggleButton {
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  background: rgba(255, 255, 255, 0.92);
+  color: var(--text);
+  border-radius: 999px;
+  padding: 10px 16px;
+  cursor: pointer;
+  font: inherit;
+  font-weight: 700;
+}
+
+.toggleButtonActive {
+  background: rgba(34, 197, 94, 0.14);
+  border-color: rgba(34, 197, 94, 0.34);
+  color: #166534;
+}
+
+.memoryOfDayCard {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 18px;
+  padding: 22px;
+  margin-top: 16px;
+  border-radius: 24px;
+  border: 1px solid rgba(255, 77, 109, 0.28);
+  background:
+    radial-gradient(circle at top left, rgba(255, 77, 109, 0.18), transparent 36%),
+    radial-gradient(circle at bottom right, rgba(251, 146, 60, 0.16), transparent 34%),
+    linear-gradient(135deg, rgba(255, 248, 250, 0.98), rgba(255, 255, 255, 0.98));
+  overflow: hidden;
+}
+
+.memoryOfDayGlow {
+  position: absolute;
+  inset: -20% auto auto -10%;
+  width: 260px;
+  height: 260px;
+  border-radius: 50%;
+  background: rgba(255, 77, 109, 0.12);
+  filter: blur(28px);
+  pointer-events: none;
+}
+
+.memoryOfDayContent {
+  position: relative;
+  display: grid;
+  gap: 10px;
+}
+
+.memoryOfDayLabel {
+  font-size: 12px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #9f1239;
+}
+
+.memoryOfDayTitle {
+  font-size: 32px;
+  line-height: 1.1;
+  font-weight: 800;
+}
+
+.memoryOfDayMeta {
+  color: rgba(17, 24, 39, 0.7);
+  font-size: 13px;
+}
+
+.statsSummaryGrid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.statCard {
+  display: grid;
+  gap: 6px;
+  padding: 18px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.88);
+  text-align: center;
+}
+
+.statCardValue {
+  font-size: 28px;
+  font-weight: 800;
+}
+
+.statCardLabel {
+  color: rgba(17, 24, 39, 0.68);
+}
+
+.statsTableWrap {
+  margin-top: 18px;
+  overflow-x: auto;
+}
+
+.statsTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.statsTable th,
+.statsTable td {
+  padding: 12px 14px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.statsTable th {
+  font-size: 13px;
+  color: rgba(17, 24, 39, 0.65);
+}
+
+.statsChartsGrid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+  margin-top: 18px;
+}
+
+.statsChartCard {
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  border-radius: 16px;
+  border: 1px solid var(--border);
+  background: rgba(255, 255, 255, 0.88);
+}
+
+.barChartList {
+  display: grid;
+  gap: 12px;
+}
+
+.barChartRow {
+  display: grid;
+  grid-template-columns: minmax(64px, 100px) 1fr 32px;
+  gap: 10px;
+  align-items: center;
+}
+
+.barChartLabel,
+.barChartValue {
+  font-size: 13px;
+}
+
+.barChartTrack {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.08);
+  overflow: hidden;
+}
+
+.barChartFill {
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #ff4d6d, #fb7185);
+}
+
+.barChartFillSecondary {
+  background: linear-gradient(90deg, #fb7185, #f59e0b);
+}
+
+.pieChartLayout {
+  display: grid;
+  grid-template-columns: 180px 1fr;
+  gap: 18px;
+  align-items: center;
+}
+
+.pieChart {
+  width: 180px;
+  height: 180px;
+  justify-self: center;
+}
+
+.pieLegend {
+  display: grid;
+  gap: 10px;
+}
+
+.pieLegendItem {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto;
+  gap: 10px;
+  align-items: center;
+}
+
+.pieLegendDot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+}
+
+.emotionHeatmap {
+  display: grid;
+  gap: 10px;
+}
+
+.emotionHeatmapHeader,
+.emotionHeatmapRow {
+  display: grid;
+  grid-template-columns: 120px repeat(7, minmax(32px, 1fr));
+  gap: 8px;
+  align-items: center;
+}
+
+.emotionHeatmapHeader {
+  color: rgba(17, 24, 39, 0.6);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.emotionHeatmapLabel {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.emotionHeatmapCell {
+  min-height: 34px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, #ff4d6d, #fb7185);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.tagLinkButton {
+  padding: 5px 10px;
+  border: none;
+  border-radius: 999px;
+  background: rgba(255, 77, 109, 0.12);
+  color: #9f1239;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .friendsGrid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -882,6 +1217,11 @@ body {
 .friendStateBadgeSuccess {
   background: rgba(34, 197, 94, 0.16);
   color: #166534;
+}
+
+.friendStateBadgeMuted {
+  background: rgba(17, 24, 39, 0.08);
+  color: rgba(17, 24, 39, 0.72);
 }
 
 .memoryDetailsHeader {
@@ -1343,8 +1683,17 @@ body {
   .accessTypeGrid,
   .categoryCreateRow,
   .friendsGrid,
-  .memoryAccessRoles {
+  .memoryAccessRoles,
+  .statsSummaryGrid,
+  .statsChartsGrid {
     grid-template-columns: 1fr;
+  }
+  .pieChartLayout {
+    grid-template-columns: 1fr;
+  }
+  .emotionHeatmapHeader,
+  .emotionHeatmapRow {
+    grid-template-columns: 88px repeat(7, minmax(24px, 1fr));
   }
   .toolbarRow,
   .searchPanelRow,
@@ -1356,6 +1705,7 @@ body {
     align-items: stretch;
   }
   .searchResultItem,
+  .notificationCard,
   .categoryManagerItem,
   .topbar,
   .nav,
@@ -1371,9 +1721,19 @@ body {
   .memoryAccessGrantedItem,
   .memoryAccessFriendCard,
   .memoryAccessFriendControls,
-  .memoryCommentComposerFooter {
+  .memoryCommentComposerFooter,
+  .memoryOfDayCard {
     flex-direction: column;
     align-items: stretch;
+  }
+  .notificationActionColumn {
+    justify-items: stretch;
+  }
+  .memoryOfDayCard {
+    grid-template-columns: 1fr;
+  }
+  .memoryOfDayTitle {
+    font-size: 26px;
   }
   .filePickerText {
     white-space: normal;

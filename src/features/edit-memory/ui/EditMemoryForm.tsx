@@ -7,6 +7,7 @@ import { ManageMemoryAccess } from "../../../features/manage-memory-access";
 import { getAccessibleMemoryById } from "../../../entities/memory";
 import { appendUserCategory, getUserCategories } from "../../../entities/memory/api/categories";
 import { getUserProfileById } from "../../../entities/user";
+import { createSharedMemoryNotification } from "../../../entities/notification";
 import {
   buildMemoryAccessPayload,
   canUserEditMemory,
@@ -244,13 +245,20 @@ export default function EditMemoryForm() {
       }
 
       let nextOwnerUsername = memoryOwnerUsername;
+      let ownerAvatarDataUrl = "";
       if (isOwner) {
         const ownerProfile = await getUserProfileById(user.uid);
         nextOwnerUsername = ownerProfile?.username ?? memoryOwnerUsername;
+        ownerAvatarDataUrl = ownerProfile?.avatarDataUrl ?? "";
       }
 
       if (isOwner) {
         const accessPayload = buildMemoryAccessPayload(accessType, sharedWith);
+        const newlySharedUsers = accessType === "shared"
+          ? accessPayload.sharedWith.filter(
+              (item) => !originalSharedWith.some((currentItem) => currentItem.userId === item.userId)
+            )
+          : [];
 
         await updateDoc(doc(db, "memories", id), {
           ownerUsername: nextOwnerUsername,
@@ -267,6 +275,23 @@ export default function EditMemoryForm() {
           photos,
           photoNames: photos.map((photo) => photo.name),
         });
+
+        if (newlySharedUsers.length > 0) {
+          const preview = buildNotificationPreview(text, place, [...emotionTags, ...placeTags, ...customTags]);
+
+          await Promise.all(
+            newlySharedUsers.map((item) => createSharedMemoryNotification({
+              userId: item.userId,
+              actorUserId: user.uid,
+              actorUsername: nextOwnerUsername,
+              actorAvatarDataUrl: ownerAvatarDataUrl,
+              memoryId: id,
+              memoryTitle: title.trim(),
+              memoryDate: date,
+              memoryPreview: preview,
+            }))
+          );
+        }
       } else {
         await updateDoc(doc(db, "memories", id), {
           title: title.trim(),
@@ -456,4 +481,22 @@ export default function EditMemoryForm() {
       </form>
     </>
   );
+}
+
+function buildNotificationPreview(text: string, place: string, tags: string[]) {
+  const normalizedText = text.trim();
+  if (normalizedText) {
+    return normalizedText.slice(0, 120);
+  }
+
+  const firstTag = tags.find(Boolean);
+  if (firstTag) {
+    return `Тег: ${firstTag}`;
+  }
+
+  if (place.trim()) {
+    return `Место: ${place.trim()}`;
+  }
+
+  return "Совместное воспоминание стало доступно";
 }

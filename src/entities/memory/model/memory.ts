@@ -373,10 +373,14 @@ export function canUserEditMemory(
 }
 
 export function canUserCommentMemory(
-  memory: Pick<NormalizedMemory, "sharedWith"> & { ownerId?: string },
+  memory: Pick<NormalizedMemory, "accessType" | "sharedWith"> & { ownerId?: string },
   userId: string
 ) {
   if (!userId) {
+    return false;
+  }
+
+  if (memory.accessType !== "shared") {
     return false;
   }
 

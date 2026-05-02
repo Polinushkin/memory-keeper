@@ -1,9 +1,25 @@
+import { useEffect, useState } from "react";
 import { Link, NavLink, Outlet } from "react-router-dom";
 import { useAuth } from "../../app/providers/auth-provider/useAuth";
+import { subscribeToNotifications } from "../../entities/notification";
 import { SignOutButton } from "../../features/sign-out";
 
 export default function AppLayout() {
   const { user } = useAuth();
+  const [unreadNotificationsCount, setUnreadNotificationsCount] = useState(0);
+
+  useEffect(() => {
+    if (!user) {
+      setUnreadNotificationsCount(0);
+      return;
+    }
+
+    return subscribeToNotifications(
+      user.uid,
+      (items) => setUnreadNotificationsCount(items.filter((item) => !item.isRead).length),
+      () => setUnreadNotificationsCount(0)
+    );
+  }, [user]);
 
   return (
     <div className="app">
@@ -27,8 +43,11 @@ export default function AppLayout() {
                 Друзья
               </NavLink>
 
-              <NavLink className="navBtn" to="/profile">
-                Профиль
+              <NavLink className="navBtn navBtnWithBadge" to="/profile">
+                <span>Профиль</span>
+                {unreadNotificationsCount > 0 && (
+                  <span className="navBadge">{unreadNotificationsCount}</span>
+                )}
               </NavLink>
 
               <SignOutButton />

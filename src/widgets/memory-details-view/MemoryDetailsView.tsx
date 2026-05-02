@@ -71,7 +71,7 @@ export default function MemoryDetailsView({
   }, [memoryId, user]);
 
   useEffect(() => {
-    if (!user || !memory) {
+    if (!user || !memory || memory.accessType !== "shared") {
       setComments([]);
       setCommentsLoading(false);
       return;
@@ -236,20 +236,22 @@ export default function MemoryDetailsView({
         {memory.text && <div className="memoryDetailsText">{memory.text}</div>}
 
         <div className="memoryDetailsBlock memoryDetailsMetaBlock">
-          <div className="memoryInlineMeta">
-            Автор:{" "}
-            {memory.ownerId ? (
-              <button
-                type="button"
-                className="inlineLinkButton"
-                onClick={() => navigate(user && memory.ownerId === user.uid ? "/profile" : `/users/${memory.ownerId}`)}
-              >
-                {memory.ownerUsername ? `@${memory.ownerUsername}` : "профиль автора"}
-              </button>
-            ) : (
-              "не указан"
-            )}
-          </div>
+          {!isOwner && (
+            <div className="memoryInlineMeta">
+              Автор:{" "}
+              {memory.ownerId ? (
+                <button
+                  type="button"
+                  className="inlineLinkButton"
+                  onClick={() => navigate(user && memory.ownerId === user.uid ? "/profile" : `/users/${memory.ownerId}`)}
+                >
+                  {memory.ownerUsername ? `@${memory.ownerUsername}` : "профиль автора"}
+                </button>
+              ) : (
+                "не указан"
+              )}
+            </div>
+          )}
           <div className="memoryInlineMeta">Уровень доступа: {getAccessTypeLabel(memory.accessType)}</div>
         </div>
 
@@ -258,9 +260,14 @@ export default function MemoryDetailsView({
             <div className="memoryAccessSubtitle">Кому открыт доступ</div>
             <div className="tagPreview">
               {memory.sharedWith.map((share) => (
-                <span key={share.userId}>
+                <button
+                  key={share.userId}
+                  type="button"
+                  className="tagLinkButton"
+                  onClick={() => navigate(share.userId === user?.uid ? "/profile" : `/users/${share.userId}`)}
+                >
                   @{share.username} · {getShareRoleLabel(share.role)}
-                </span>
+                </button>
               ))}
             </div>
           </div>
@@ -276,64 +283,66 @@ export default function MemoryDetailsView({
           <div className="memoryInlineMeta">Дата создания: {formatCreatedAt(memory.createdAt)}</div>
         </div>
 
-        <div className="memoryDetailsBlock memoryDetailsCommentsBlock">
-          <div className="memoryAccessSubtitle">Комментарии</div>
+        {memory.accessType === "shared" && (
+          <div className="memoryDetailsBlock memoryDetailsCommentsBlock">
+            <div className="memoryAccessSubtitle">Комментарии</div>
 
-          {canComment ? (
-            <div className="memoryCommentComposer">
-              <textarea
-                className="textarea"
-                placeholder="Напишите комментарий"
-                value={commentText}
-                onChange={(event) => setCommentText(event.target.value)}
-                maxLength={MEMORY_COMMENT_MAX}
-                rows={3}
-              />
-              <div className="memoryCommentComposerFooter">
-                <div className="hint">{commentText.length}/{MEMORY_COMMENT_MAX}</div>
-                <button
-                  type="button"
-                  className="btnPrimary"
-                  onClick={() => void handleCommentSubmit()}
-                  disabled={commentSaving}
-                >
-                  {commentSaving ? "Сохраняем..." : "Отправить"}
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="emptyState">Оставлять комментарии могут владелец и пользователи с правом comment/edit.</div>
-          )}
-
-          {commentsError && <div className="error">{commentsError}</div>}
-
-          {commentsLoading ? (
-            <div className="emptyState">Загрузка комментариев...</div>
-          ) : comments.length === 0 ? (
-            <div className="emptyState">Пока комментариев нет.</div>
-          ) : (
-            <div className="memoryCommentsList">
-              {comments.map((comment) => (
-                <div className="memoryCommentCard" key={comment.id}>
-                  {comment.authorAvatarDataUrl ? (
-                    <img className="memoryCommentAvatar" src={comment.authorAvatarDataUrl} alt={comment.authorUsername || "Автор"} />
-                  ) : (
-                    <div className="memoryCommentAvatarPlaceholder">
-                      {(comment.authorUsername || "?").slice(0, 1).toUpperCase()}
-                    </div>
-                  )}
-                  <div className="memoryCommentBody">
-                    <div className="memoryCommentHeader">
-                      <span className="memoryCommentAuthor">@{comment.authorUsername || "user"}</span>
-                      <span className="memoryCommentDate">{formatCreatedAt(comment.createdAt)}</span>
-                    </div>
-                    <div className="memoryCommentText">{comment.text}</div>
-                  </div>
+            {canComment ? (
+              <div className="memoryCommentComposer">
+                <textarea
+                  className="textarea"
+                  placeholder="Напишите комментарий"
+                  value={commentText}
+                  onChange={(event) => setCommentText(event.target.value)}
+                  maxLength={MEMORY_COMMENT_MAX}
+                  rows={3}
+                />
+                <div className="memoryCommentComposerFooter">
+                  <div className="hint">{commentText.length}/{MEMORY_COMMENT_MAX}</div>
+                  <button
+                    type="button"
+                    className="btnPrimary"
+                    onClick={() => void handleCommentSubmit()}
+                    disabled={commentSaving}
+                  >
+                    {commentSaving ? "Сохраняем..." : "Отправить"}
+                  </button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+              </div>
+            ) : (
+              <div className="emptyState">Комментировать shared-memory могут только участники с правом comment/edit.</div>
+            )}
+
+            {commentsError && <div className="error">{commentsError}</div>}
+
+            {commentsLoading ? (
+              <div className="emptyState">Загрузка комментариев...</div>
+            ) : comments.length === 0 ? (
+              <div className="emptyState">Пока комментариев нет.</div>
+            ) : (
+              <div className="memoryCommentsList">
+                {comments.map((comment) => (
+                  <div className="memoryCommentCard" key={comment.id}>
+                    {comment.authorAvatarDataUrl ? (
+                      <img className="memoryCommentAvatar" src={comment.authorAvatarDataUrl} alt={comment.authorUsername || "Автор"} />
+                    ) : (
+                      <div className="memoryCommentAvatarPlaceholder">
+                        {(comment.authorUsername || "?").slice(0, 1).toUpperCase()}
+                      </div>
+                    )}
+                    <div className="memoryCommentBody">
+                      <div className="memoryCommentHeader">
+                        <span className="memoryCommentAuthor">@{comment.authorUsername || "user"}</span>
+                        <span className="memoryCommentDate">{formatCreatedAt(comment.createdAt)}</span>
+                      </div>
+                      <div className="memoryCommentText">{comment.text}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </div>
     </div>
   );
