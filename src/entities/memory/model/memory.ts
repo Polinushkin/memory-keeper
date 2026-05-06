@@ -24,6 +24,7 @@ export type MemoryDocument = {
   title?: unknown;
   text?: unknown;
   date?: unknown;
+  time?: unknown;
   createdAt?: unknown;
   place?: unknown;
   emotion?: unknown;
@@ -31,6 +32,7 @@ export type MemoryDocument = {
   placeTags?: unknown;
   customTags?: unknown;
   category?: unknown;
+  categories?: unknown;
   accessType?: unknown;
   sharedWith?: unknown;
   sharedUserIds?: unknown;
@@ -77,12 +79,14 @@ export type NormalizedMemory = {
   title: string;
   text: string;
   date: string;
+  time: string;
   createdAt: Date | null;
   place: string;
   emotionTags: string[];
   placeTags: string[];
   customTags: string[];
   category: string;
+  categories: string[];
   accessType: MemoryAccessType;
   sharedWith: NormalizedMemoryShare[];
   sharedUserIds: string[];
@@ -198,7 +202,20 @@ export function getCustomTags(memory: MemoryDocument) {
 }
 
 export function getCategory(memory: MemoryDocument) {
-  return typeof memory.category === "string" ? memory.category.trim() : "";
+  return getCategories(memory)[0] ?? "";
+}
+
+export function getCategories(memory: MemoryDocument) {
+  const normalizedCategories = normalizeList(memory.categories);
+  if (normalizedCategories.length > 0) {
+    return normalizeCategories({ categories: normalizedCategories });
+  }
+
+  if (typeof memory.category === "string" && memory.category.trim()) {
+    return [memory.category.trim()];
+  }
+
+  return [];
 }
 
 export function getDateValue(value: unknown) {
@@ -415,12 +432,14 @@ export function normalizeMemory(id: string, memory: MemoryDocument): NormalizedM
     title: typeof memory.title === "string" ? memory.title : "",
     text: typeof memory.text === "string" ? memory.text : "",
     date: typeof memory.date === "string" ? memory.date : "",
+    time: typeof memory.time === "string" ? memory.time : "",
     createdAt: getDateValue(memory.createdAt),
     place: typeof memory.place === "string" ? memory.place : "",
     emotionTags: getEmotionTags(memory),
     placeTags: getPlaceTags(memory),
     customTags: getCustomTags(memory),
     category: getCategory(memory),
+    categories: getCategories(memory),
     accessType: getAccessType(memory.accessType),
     sharedWith: getSharedWith(memory),
     sharedUserIds: getSharedUserIds(memory),

@@ -67,21 +67,13 @@ export async function renameCategory(userId: string, currentName: string, nextNa
   const nextCategories = categories.map((category) => (category === previous ? updated : category));
   await saveUserCategories(userId, nextCategories);
 
-  const memoriesSnapshot = await getDocs(
-    query(
-      collection(db, "memories"),
-      where("ownerId", "==", userId),
-      where("category", "==", previous)
-    )
-  );
+  await updateCategoryInMemories(userId, previous, (memoryCategories) => {
+    const renamedCategories = memoryCategories.map((category) => (
+      category === previous ? updated : category
+    ));
 
-  if (!memoriesSnapshot.empty) {
-    const batch = writeBatch(db);
-    memoriesSnapshot.docs.forEach((item) => {
-      batch.update(item.ref, { category: updated });
-    });
-    await batch.commit();
-  }
+    return buildCategoryPayload(renamedCategories);
+  });
 
   return normalizeCategories({ categories: nextCategories });
 }
@@ -96,21 +88,65 @@ export async function deleteCategory(userId: string, categoryName: string) {
   const nextCategories = categories.filter((category) => category !== target);
   await saveUserCategories(userId, nextCategories);
 
-  const memoriesSnapshot = await getDocs(
-    query(
-      collection(db, "memories"),
-      where("ownerId", "==", userId),
-      where("category", "==", target)
-    )
-  );
-
-  if (!memoriesSnapshot.empty) {
-    const batch = writeBatch(db);
-    memoriesSnapshot.docs.forEach((item) => {
-      batch.update(item.ref, { category: "" });
-    });
-    await batch.commit();
-  }
+  await updateCategoryInMemories(userId, target, (memoryCategories) => {
+    const remainingCategories = memoryCategories.filter((category) => category !== target);
+    return buildCategoryPayload(remainingCategories);
+  });
 
   return nextCategories;
+}
+
+async function updateCategoryInMemories(
+  userId: string,
+  targetCategory: string,
+  buildPayload: (memoryCategories: string[]) => { category: string; categories: string[] }
+) {
+  const [legacySnapshot, multiSnapshot] = await Promise.all([
+    getDocs(
+      query(
+        collection(db, "memories"),
+        where("ownerId", "==", userId),
+        where("category", "==", targetCategory)
+      )
+    ),
+    getDocs(
+      query(
+        collection(db, "memories"),
+        where("ownerId", "==", userId),
+        where("categories", "array-contains", targetCategory)
+      )
+    ),
+  ]);
+
+  const uniqueDocs = new Map<string, typeof legacySnapshot.docs[number]>();
+  [...legacySnapshot.docs, ...multiSnapshot.docs].forEach((item) => {
+    uniqueDocs.set(item.id, item);
+  });
+
+  if (uniqueDocs.size === 0) {
+    return;
+  }
+
+  const batch = writeBatch(db);
+  uniqueDocs.forEach((item) => {
+    const data = item.data();
+    const currentCategories = normalizeCategories({
+      categories: Array.isArray(data.categories)
+        ? data.categories
+        : data.category
+          ? [data.category]
+          : [],
+    });
+
+    batch.update(item.ref, buildPayload(currentCategories));
+  });
+  await batch.commit();
+}
+
+function buildCategoryPayload(categories: string[]) {
+  const normalized = normalizeCategories({ categories });
+  return {
+    category: normalized[0] ?? "",
+    categories: normalized,
+  };
 }

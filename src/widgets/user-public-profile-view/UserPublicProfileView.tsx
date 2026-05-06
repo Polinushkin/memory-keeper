@@ -1,5 +1,7 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../../app/providers/auth-provider/useAuth";
+import { areUsersFriends } from "../../entities/friend";
 import { getUserProfileById, type UserSearchResult } from "../../entities/user";
 import { getErrorMessage } from "../../shared/lib/firebase-errors";
 
@@ -7,9 +9,17 @@ type UserPublicProfileViewProps = {
   userId: string;
 };
 
+type ReturnState = {
+  returnTo?: string;
+  profileOriginReturnTo?: string;
+};
+
 export default function UserPublicProfileView({ userId }: UserPublicProfileViewProps) {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { user } = useAuth();
   const [profile, setProfile] = useState<UserSearchResult | null>(null);
+  const [isFriend, setIsFriend] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -21,7 +31,11 @@ export default function UserPublicProfileView({ userId }: UserPublicProfileViewP
       setError(null);
 
       try {
-        const nextProfile = await getUserProfileById(userId);
+        const [nextProfile, friendship] = await Promise.all([
+          getUserProfileById(userId, user?.uid),
+          user?.uid ? areUsersFriends(user.uid, userId) : Promise.resolve(false),
+        ]);
+
         if (!active) {
           return;
         }
@@ -33,6 +47,7 @@ export default function UserPublicProfileView({ userId }: UserPublicProfileViewP
         }
 
         setProfile(nextProfile);
+        setIsFriend(friendship);
       } catch (loadError: unknown) {
         if (!active) {
           return;
@@ -52,7 +67,22 @@ export default function UserPublicProfileView({ userId }: UserPublicProfileViewP
     return () => {
       active = false;
     };
-  }, [userId]);
+  }, [user?.uid, userId]);
+
+  function handleBack() {
+    const returnTo = (location.state as ReturnState | null)?.returnTo;
+    if (returnTo) {
+      navigate(returnTo);
+      return;
+    }
+
+    if (window.history.length > 1) {
+      navigate(-1);
+      return;
+    }
+
+    navigate("/friends");
+  }
 
   if (loading) {
     return <div className="card">Загрузка...</div>;
@@ -66,8 +96,21 @@ export default function UserPublicProfileView({ userId }: UserPublicProfileViewP
     );
   }
 
+  const isOwner = user?.uid === userId;
+  const descriptionHidden =
+    !profile.description &&
+    !isOwner &&
+    (profile.descriptionVisibility === "private" ||
+      (profile.descriptionVisibility === "friends" && !isFriend));
+
   return (
     <section className="card sectionCard publicProfileCard">
+      <div className="publicProfileActions publicProfileActionsTop">
+        <button type="button" className="btnSecondary" onClick={handleBack}>
+          Назад
+        </button>
+      </div>
+
       <div className="publicProfileHeader">
         {profile.avatarDataUrl ? (
           <img className="publicProfileAvatar" src={profile.avatarDataUrl} alt={profile.username} />
@@ -77,7 +120,8 @@ export default function UserPublicProfileView({ userId }: UserPublicProfileViewP
 
         <div className="publicProfileBody">
           <div className="sectionTitle">@{profile.username}</div>
-          {profile.description && <div className="sectionText">{profile.description}</div>}
+          {profile.description ? <div className="sectionText">{profile.description}</div> : null}
+          {descriptionHidden ? <div className="sectionText">Описание пользователя скрыто</div> : null}
         </div>
       </div>
 
@@ -85,7 +129,14 @@ export default function UserPublicProfileView({ userId }: UserPublicProfileViewP
         <button
           type="button"
           className="btnSecondary"
-          onClick={() => navigate(`/users/${userId}/memories`)}
+          onClick={() =>
+            navigate(`/users/${userId}/memories`, {
+              state: {
+                returnTo: `${location.pathname}${location.search}`,
+                profileOriginReturnTo: (location.state as ReturnState | null)?.returnTo ?? "",
+              },
+            })
+          }
         >
           Публичные воспоминания
         </button>

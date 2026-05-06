@@ -4,6 +4,7 @@ import ProtectedRoute from "./ProtectedRoute";
 
 import LoginPage from "../../pages/login-page/LoginPage";
 import RegisterPage from "../../pages/register-page/RegisterPage";
+import ForgotPasswordPage from "../../pages/forgot-password-page/ForgotPasswordPage";
 import MemoriesPage from "../../pages/memories-page/MemoriesPage";
 import MemoryDetailsPage from "../../pages/memory-details-page/MemoryDetailsPage";
 import ProfilePage from "../../pages/profile-page/ProfilePage";
@@ -30,6 +31,10 @@ export const router = createBrowserRouter([
       {
         path: "/register",
         element: <RegisterPage />,
+      },
+      {
+        path: "/forgot-password",
+        element: <ForgotPasswordPage />,
       },
       {
         path: "/memories",

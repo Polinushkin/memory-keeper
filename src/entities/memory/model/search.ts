@@ -6,14 +6,16 @@ export function searchMemoriesByQuery(items: NormalizedMemory[], query: string) 
     return [];
   }
 
-  return items.filter((item) => (
-    getMemorySearchText(item).includes(normalizedQuery)
-  ));
+  return items.filter((item) => getMemorySearchText(item).includes(normalizedQuery));
 }
 
 export function getMemoryPreview(item: NormalizedMemory) {
   const firstTag = getAllTags(item)[0];
-  const parts = [item.text.trim(), firstTag ? `Тег: ${firstTag}` : "", item.place ? `Место: ${item.place}` : ""]
+  const parts = [
+    item.text.trim(),
+    firstTag ? `Тег: ${firstTag}` : "",
+    item.place ? `Место: ${item.place}` : "",
+  ]
     .filter(Boolean)
     .join(" • ");
 
@@ -24,8 +26,11 @@ function getMemorySearchText(item: NormalizedMemory) {
   return [
     item.title,
     item.text,
+    item.ownerUsername,
+    ...item.categories,
     ...item.emotionTags,
     ...item.placeTags,
     ...item.customTags,
+    ...item.sharedWith.map((share) => share.username),
   ].join(" ").toLowerCase();
 }

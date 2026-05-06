@@ -23,7 +23,7 @@ export function getAuthErrorMessage(error: unknown, fallback: string) {
     case "auth/invalid-credential":
     case "auth/wrong-password":
     case "auth/user-not-found":
-      return "Неверное имя пользователя, email или пароль";
+      return "Неверное имя пользователя или пароль";
     case "auth/too-many-requests":
       return "Слишком много попыток. Попробуйте позже";
     default:
@@ -57,7 +57,7 @@ export function getErrorMessage(error: unknown, fallback: string) {
     case "auth/invalid-credential":
     case "auth/wrong-password":
     case "auth/user-not-found":
-      return "Неверное имя пользователя, email или пароль";
+      return "Неверное имя пользователя или пароль";
     case "auth/too-many-requests":
       return "Слишком много попыток. Попробуйте позже";
     default:

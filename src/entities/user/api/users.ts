@@ -11,8 +11,16 @@ import {
   where,
 } from "firebase/firestore";
 import { db } from "../../../shared/api/firebase/firebase";
+import { buildFriendshipId } from "../../friend/model/friend";
 import { normalizeUsername } from "../../../shared/lib/validation";
-import type { UserProfileRow, UserRow, UserSearchResult, UsernameRow } from "../model/user";
+import {
+  getProfileVisibility,
+  getSharedInvitePolicy,
+  type UserProfileRow,
+  type UserRow,
+  type UserSearchResult,
+  type UsernameRow,
+} from "../model/user";
 
 export async function isUsernameTaken(username: string, currentUid?: string) {
   const normalized = normalizeUsername(username);
@@ -66,44 +74,45 @@ export async function searchUsersByUsername(username: string, currentUid?: strin
       return {
         id: uid,
         username: String(usernameData.username ?? snapshot.id),
-        usernameLower: normalizeUsername(String(usernameData.usernameLower ?? usernameData.username ?? snapshot.id)),
-        description: String(usernameData.description ?? ""),
-        avatarDataUrl: String(usernameData.avatarDataUrl ?? ""),
       };
     })
-    .filter((item): item is UserSearchResult => Boolean(item));
+    .filter((item): item is { id: string; username: string } => Boolean(item));
 
   const hydratedResults = await Promise.all(
-    rawResults.map(async (item) => {
-      if (item.description && item.avatarDataUrl) {
-        return item;
-      }
-
-      try {
-        const userSnapshot = await getDoc(doc(db, "users", item.id));
-        if (!userSnapshot.exists()) {
-          return item;
-        }
-
-        const userData = userSnapshot.data() as UserProfileRow;
-        return {
-          ...item,
-          description: item.description || String(userData.description ?? ""),
-          avatarDataUrl: item.avatarDataUrl || String(userData.avatarDataUrl ?? ""),
-        };
-      } catch {
-        return item;
-      }
-    })
+    rawResults.map((item) => getUserProfileById(item.id, currentUid))
   );
 
-  return hydratedResults;
+  return hydratedResults.filter((item): item is UserSearchResult => Boolean(item));
 }
 
-export async function getUserProfileById(userId: string) {
-  const [userSnapshot, usernameSnapshot] = await Promise.all([
+export async function searchUsersByUsernameOrEmail(queryValue: string, currentUid?: string) {
+  const trimmedQuery = queryValue.trim();
+  if (!trimmedQuery) {
+    return [];
+  }
+
+  const [usernameResults, emailResults] = await Promise.all([
+    searchUsersByUsername(trimmedQuery, currentUid),
+    findUsersByEmail(trimmedQuery, currentUid),
+  ]);
+
+  const unique = new Map<string, UserSearchResult>();
+  [...usernameResults, ...emailResults].forEach((item) => {
+    unique.set(item.id, item);
+  });
+
+  return Array.from(unique.values()).sort((left, right) => left.username.localeCompare(right.username, "ru"));
+}
+
+export async function getUserProfileById(userId: string, viewerId?: string) {
+  const [userSnapshot, usernameSnapshot, isFriend] = await Promise.all([
     getDoc(doc(db, "users", userId)),
     getDocs(query(collection(db, "usernames"), where("uid", "==", userId), limit(1))),
+    viewerId && viewerId !== userId
+      ? getDoc(doc(db, "friends", buildFriendshipId(userId, viewerId)))
+          .then((snapshot) => snapshot.exists())
+          .catch(() => false)
+      : Promise.resolve(false),
   ]);
 
   if (!userSnapshot.exists() && usernameSnapshot.empty) {
@@ -111,7 +120,7 @@ export async function getUserProfileById(userId: string) {
   }
 
   const userData = userSnapshot.exists()
-    ? (userSnapshot.data() as UserProfileRow & { username?: string; usernameLower?: string })
+    ? (userSnapshot.data() as UserProfileRow)
     : null;
   const usernameData = !usernameSnapshot.empty ? (usernameSnapshot.docs[0].data() as UsernameRow) : null;
   const username = String(userData?.username ?? usernameData?.username ?? "");
@@ -120,11 +129,64 @@ export async function getUserProfileById(userId: string) {
     return null;
   }
 
+  const isOwner = viewerId === userId;
+  const descriptionVisibility = getProfileVisibility(userData?.descriptionVisibility);
+  const avatarVisibility = getProfileVisibility(userData?.avatarVisibility);
+  const sharedInvitePolicy = getSharedInvitePolicy(userData?.sharedInvitePolicy);
+
   return {
     id: userId,
     username,
     usernameLower: normalizeUsername(String(userData?.usernameLower ?? usernameData?.usernameLower ?? username)),
-    description: String(userData?.description ?? usernameData?.description ?? ""),
-    avatarDataUrl: String(userData?.avatarDataUrl ?? usernameData?.avatarDataUrl ?? ""),
+    description: canViewField(descriptionVisibility, isOwner, isFriend)
+      ? String(userData?.description ?? usernameData?.description ?? "")
+      : "",
+    avatarDataUrl: canViewField(avatarVisibility, isOwner, isFriend)
+      ? String(userData?.avatarDataUrl ?? usernameData?.avatarDataUrl ?? "")
+      : "",
+    descriptionVisibility,
+    avatarVisibility,
+    sharedInvitePolicy,
   } satisfies UserSearchResult;
+}
+
+function canViewField(
+  visibility: "public" | "friends" | "private",
+  isOwner: boolean,
+  isFriend: boolean
+) {
+  if (isOwner) {
+    return true;
+  }
+
+  if (visibility === "public") {
+    return true;
+  }
+
+  if (visibility === "friends") {
+    return isFriend;
+  }
+
+  return false;
+}
+
+async function findUsersByEmail(email: string, currentUid?: string) {
+  const candidates = Array.from(new Set([email.trim(), email.trim().toLowerCase()])).filter(Boolean);
+  if (candidates.length === 0) {
+    return [];
+  }
+
+  const snapshots = await Promise.all(
+    candidates.map((candidate) => getDocs(
+      query(collection(db, "users"), where("email", "==", candidate), limit(8))
+    ))
+  );
+
+  const userIds = Array.from(new Set(
+    snapshots.flatMap((snapshot) => snapshot.docs.map((item) => item.id))
+      .filter((id) => id && id !== currentUid)
+  ));
+
+  const profiles = await Promise.all(userIds.map((userId) => getUserProfileById(userId, currentUid)));
+  return profiles.filter((item): item is UserSearchResult => Boolean(item));
 }

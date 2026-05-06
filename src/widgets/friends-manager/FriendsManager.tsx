@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { useLocation, useNavigate } from "react-router-dom";
 import {
   cancelFriendRequest,
   getFriendProfiles,
@@ -10,7 +11,11 @@ import {
   type FriendProfile,
   type NormalizedFriendRequest,
 } from "../../entities/friend";
-import { getUserProfileById, searchUsersByUsername, type UserSearchResult } from "../../entities/user";
+import {
+  getUserProfileById,
+  searchUsersByUsernameOrEmail,
+  type UserSearchResult,
+} from "../../entities/user";
 import { useAuth } from "../../app/providers/auth-provider/useAuth";
 import { getErrorMessage } from "../../shared/lib/firebase-errors";
 
@@ -22,6 +27,8 @@ type CurrentProfile = {
 
 export default function FriendsManager() {
   const { user } = useAuth();
+  const navigate = useNavigate();
+  const location = useLocation();
   const [currentProfile, setCurrentProfile] = useState<CurrentProfile | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [searchResults, setSearchResults] = useState<UserSearchResult[]>([]);
@@ -48,7 +55,7 @@ export default function FriendsManager() {
 
     try {
       const [profile, incoming, outgoing, nextFriends] = await Promise.all([
-        getUserProfileById(userId),
+        getUserProfileById(userId, userId),
         getIncomingFriendRequests(userId),
         getOutgoingFriendRequests(userId),
         getFriendProfiles(userId),
@@ -57,10 +64,7 @@ export default function FriendsManager() {
       setCurrentProfile(
         profile
           ? { id: profile.id, username: profile.username }
-          : {
-              id: userId,
-              username: getFallbackUsername(user?.email, userId),
-            }
+          : { id: userId, username: getFallbackUsername(user?.email, userId) }
       );
       setIncomingRequests(incoming.filter((item) => item.status === "pending"));
       setOutgoingRequests(outgoing.filter((item) => item.status === "pending"));
@@ -113,7 +117,7 @@ export default function FriendsManager() {
     setError(null);
 
     try {
-      const results = await searchUsersByUsername(normalizedQuery, user.uid);
+      const results = await searchUsersByUsernameOrEmail(normalizedQuery, user.uid);
       setSearchResults(results);
       refreshSearchStates(results);
     } catch (searchError: unknown) {
@@ -157,6 +161,7 @@ export default function FriendsManager() {
       if (actionError instanceof Error && actionError.message === "FRIEND_REQUEST_ALREADY_EXISTS") {
         await reloadAfterAction();
       }
+
       setError(getFriendsErrorMessage(actionError, "Не удалось отправить заявку в друзья"));
     } finally {
       setBusyKey("");
@@ -232,6 +237,7 @@ export default function FriendsManager() {
   }
 
   const friendsById = useMemo(() => new Set(friends.map((item) => item.id)), [friends]);
+  const returnTo = `${location.pathname}${location.search}`;
 
   if (loading) {
     return <div className="card">Загрузка...</div>;
@@ -244,7 +250,8 @@ export default function FriendsManager() {
           <div>
             <div className="sectionTitle">Поиск пользователей</div>
             <div className="sectionText">
-              Ищите пользователей по username, отправляйте заявки в друзья и отслеживайте текущий статус связи.
+              Ищите пользователей по username или email, отправляйте заявки в друзья и
+              отслеживайте текущий статус связи.
             </div>
           </div>
         </div>
@@ -253,7 +260,7 @@ export default function FriendsManager() {
           <div className="field searchPanelField">
             <input
               className="input"
-              placeholder="Например, anna"
+              placeholder="Например, anna или anna@mail.com"
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               onKeyDown={(event) => {
@@ -287,7 +294,11 @@ export default function FriendsManager() {
 
               return (
                 <div className="searchResultItem" key={item.id}>
-                  <div className="searchUserIdentity">
+                  <button
+                    type="button"
+                    className="searchUserIdentity searchResultButton"
+                    onClick={() => navigate(`/users/${item.id}`, { state: { returnTo } })}
+                  >
                     {item.avatarDataUrl ? (
                       <img className="searchUserAvatar" src={item.avatarDataUrl} alt={item.username} />
                     ) : (
@@ -297,7 +308,7 @@ export default function FriendsManager() {
                       <div className="searchResultTitle">@{item.username}</div>
                       <div className="searchResultPreview">{getSearchPreviewText(item.description)}</div>
                     </div>
-                  </div>
+                  </button>
 
                   <div className="friendActionGroup">
                     {state === "none" && (
@@ -311,8 +322,12 @@ export default function FriendsManager() {
                       </button>
                     )}
                     {state === "outgoing" && <span className="friendStateBadge">Заявка отправлена</span>}
-                    {state === "incoming" && <span className="friendStateBadge friendStateBadgeAccent">Есть входящая заявка</span>}
-                    {state === "friends" && <span className="friendStateBadge friendStateBadgeSuccess">Уже в друзьях</span>}
+                    {state === "incoming" && (
+                      <span className="friendStateBadge friendStateBadgeAccent">Есть входящая заявка</span>
+                    )}
+                    {state === "friends" && (
+                      <span className="friendStateBadge friendStateBadgeSuccess">Уже в друзьях</span>
+                    )}
                   </div>
                 </div>
               );
@@ -334,7 +349,9 @@ export default function FriendsManager() {
           <div className="sectionHeader">
             <div>
               <div className="sectionTitle">Входящие заявки</div>
-              <div className="sectionText">Здесь отображаются пользователи, которые хотят добавить вас в друзья.</div>
+              <div className="sectionText">
+                Здесь отображаются пользователи, которые хотят добавить вас в друзья.
+              </div>
             </div>
           </div>
 
@@ -342,10 +359,16 @@ export default function FriendsManager() {
             <div className="friendList">
               {incomingRequests.map((request) => (
                 <div className="friendCard" key={request.id}>
-                  <div className="friendCardBody">
-                    <div className="friendCardTitle">@{request.fromUsername}</div>
-                    <div className="friendCardMeta">Отправлено: {formatDateTime(request.createdAt)}</div>
-                  </div>
+                  <button
+                    type="button"
+                    className="searchUserIdentity searchResultButton"
+                    onClick={() => navigate(`/users/${request.fromUserId}`, { state: { returnTo } })}
+                  >
+                    <div className="friendCardBody">
+                      <div className="friendCardTitle">@{request.fromUsername}</div>
+                      <div className="friendCardMeta">Отправлено: {formatDateTime(request.createdAt)}</div>
+                    </div>
+                  </button>
                   <div className="friendActionGroup">
                     <button
                       className="btnSmall"
@@ -376,7 +399,9 @@ export default function FriendsManager() {
           <div className="sectionHeader">
             <div>
               <div className="sectionTitle">Исходящие заявки</div>
-              <div className="sectionText">Список пользователей, которым вы уже отправили запрос.</div>
+              <div className="sectionText">
+                Список пользователей, которым вы уже отправили запрос.
+              </div>
             </div>
           </div>
 
@@ -384,10 +409,16 @@ export default function FriendsManager() {
             <div className="friendList">
               {outgoingRequests.map((request) => (
                 <div className="friendCard" key={request.id}>
-                  <div className="friendCardBody">
-                    <div className="friendCardTitle">@{request.toUsername}</div>
-                    <div className="friendCardMeta">Отправлено: {formatDateTime(request.createdAt)}</div>
-                  </div>
+                  <button
+                    type="button"
+                    className="searchUserIdentity searchResultButton"
+                    onClick={() => navigate(`/users/${request.toUserId}`, { state: { returnTo } })}
+                  >
+                    <div className="friendCardBody">
+                      <div className="friendCardTitle">@{request.toUsername}</div>
+                      <div className="friendCardMeta">Отправлено: {formatDateTime(request.createdAt)}</div>
+                    </div>
+                  </button>
                   <div className="friendActionGroup">
                     <button
                       className="btnSmallDanger"
@@ -411,7 +442,10 @@ export default function FriendsManager() {
         <div className="sectionHeader">
           <div>
             <div className="sectionTitle">Мои друзья</div>
-            <div className="sectionText">Этот список будет использоваться дальше при настройке совместного доступа к воспоминаниям.</div>
+            <div className="sectionText">
+              Из этого списка можно сразу перейти в профиль друга. Он также используется дальше
+              при настройке совместного доступа к воспоминаниям.
+            </div>
           </div>
         </div>
 
@@ -419,7 +453,11 @@ export default function FriendsManager() {
           <div className="friendList">
             {friends.map((friend) => (
               <div className="friendCard" key={friend.id}>
-                <div className="searchUserIdentity">
+                <button
+                    type="button"
+                    className="searchUserIdentity searchResultButton"
+                    onClick={() => navigate(`/users/${friend.id}`, { state: { returnTo } })}
+                  >
                   {friend.avatarDataUrl ? (
                     <img className="searchUserAvatar" src={friend.avatarDataUrl} alt={friend.username} />
                   ) : (
@@ -429,7 +467,7 @@ export default function FriendsManager() {
                     <div className="friendCardTitle">@{friend.username}</div>
                     <div className="searchResultPreview">{getSearchPreviewText(friend.description, "Друг добавлен")}</div>
                   </div>
-                </div>
+                </button>
                 <div className="friendActionGroup">
                   <button
                     className="btnSmallDanger"
@@ -444,7 +482,9 @@ export default function FriendsManager() {
             ))}
           </div>
         ) : (
-          <div className="emptyState">Список друзей пока пуст. Найдите пользователя и отправьте первую заявку.</div>
+          <div className="emptyState">
+            Список друзей пока пуст. Найдите пользователя и отправьте первую заявку.
+          </div>
         )}
       </section>
     </div>
@@ -470,7 +510,7 @@ function getFriendsErrorMessage(error: unknown, fallback: string) {
     switch (error.message) {
       case "permission-denied":
       case "firestore/permission-denied":
-        return "Для раздела друзей еще не настроены правила доступа Firestore";
+        return "Для раздела друзей ещё не настроены правила доступа Firestore";
       case "FRIEND_REQUEST_SELF":
         return "Нельзя отправить заявку самому себе";
       case "FRIEND_ALREADY_EXISTS":

@@ -12,6 +12,7 @@ import {
   DEFAULT_MEMORY_SORT_MODE,
   deleteMemoryById,
   getMemoryPreview,
+  getPublicMemoriesByOwnerIds,
   getUserCategories,
   MEMORY_ACCESS_TYPES,
   normalizeMemory,
@@ -36,6 +37,7 @@ const EMPTY_FILTERS: MemoryFilters = {
   dateFrom: "",
   dateTo: "",
   accessType: "",
+  sharedUserId: "",
 };
 
 type MemoriesListScope = "owned" | "shared" | "publicProfile";
@@ -67,6 +69,7 @@ export default function MemoriesList({
     dateFrom: searchParams.get("dateFrom") ?? "",
     dateTo: searchParams.get("dateTo") ?? "",
     accessType: (searchParams.get("access") ?? "") as MemoryFilters["accessType"],
+    sharedUserId: searchParams.get("sharedUserId") ?? "",
   };
 
   const [items, setItems] = useState<NormalizedMemory[]>([]);
@@ -84,6 +87,7 @@ export default function MemoriesList({
   const [appliedSearchQuery, setAppliedSearchQuery] = useState(initialSearch);
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [userResults, setUserResults] = useState<UserSearchResult[]>([]);
+  const [publicSearchResults, setPublicSearchResults] = useState<NormalizedMemory[]>([]);
 
   const [draftFilters, setDraftFilters] = useState<MemoryFilters>(initialFilters);
   const [appliedFilters, setAppliedFilters] = useState<MemoryFilters>(initialFilters);
@@ -147,6 +151,7 @@ export default function MemoriesList({
   useEffect(() => {
     if (!showUserSearch || !user || !appliedSearchQuery.trim()) {
       setUserResults([]);
+      setPublicSearchResults([]);
       return;
     }
 
@@ -155,9 +160,12 @@ export default function MemoriesList({
     async function loadUsers() {
       setSearchingUsers(true);
       try {
-        setUserResults(await searchUsersByUsername(appliedSearchQuery, currentUserId));
+        const nextUsers = await searchUsersByUsername(appliedSearchQuery, currentUserId);
+        setUserResults(nextUsers);
+        setPublicSearchResults(await getPublicMemoriesByOwnerIds(nextUsers.map((item) => item.id)));
       } catch {
         setUserResults([]);
+        setPublicSearchResults([]);
       } finally {
         setSearchingUsers(false);
       }
@@ -167,9 +175,31 @@ export default function MemoriesList({
   }, [appliedSearchQuery, showUserSearch, user]);
 
   const categoryOptions = useMemo(() => (
-    Array.from(new Set([...categories, ...items.map((item) => item.category).filter(Boolean)]))
-      .sort((left, right) => left.localeCompare(right, "ru"))
+    Array.from(new Set([
+      ...categories,
+      ...items.flatMap((item) => item.categories),
+    ])).sort((left, right) => left.localeCompare(right, "ru"))
   ), [categories, items]);
+
+  const sharedUserOptions = useMemo(() => {
+    const unique = new Map<string, { userId: string; username: string }>();
+    items.forEach((item) => {
+      item.sharedWith.forEach((share) => {
+        const normalizedUsername = share.username.trim().toLocaleLowerCase("ru-RU");
+        if (!share.userId || !normalizedUsername || unique.has(normalizedUsername)) {
+          return;
+        }
+
+        unique.set(normalizedUsername, {
+          userId: share.userId,
+          username: share.username,
+        });
+      });
+    });
+
+    return Array.from(unique.values())
+      .sort((left, right) => left.username.localeCompare(right.username, "ru"));
+  }, [items]);
 
   const filteredItems = useMemo(() => (
     sortMemories(applyMemoryFilters(items, appliedFilters), sortMode)
@@ -179,6 +209,14 @@ export default function MemoriesList({
     searchMemoriesByQuery(items, appliedSearchQuery)
   ), [appliedSearchQuery, items]);
 
+  const combinedMemorySearchResults = useMemo(() => {
+    const unique = new Map<string, NormalizedMemory>();
+    [...memorySearchResults, ...publicSearchResults].forEach((item) => {
+      unique.set(item.id, item);
+    });
+    return Array.from(unique.values());
+  }, [memorySearchResults, publicSearchResults]);
+
   function syncParams(next: {
     search?: string;
     category?: string;
@@ -187,6 +225,7 @@ export default function MemoriesList({
     dateFrom?: string;
     dateTo?: string;
     access?: string;
+    sharedUserId?: string;
     sort?: string;
   }) {
     const params = new URLSearchParams();
@@ -197,6 +236,7 @@ export default function MemoriesList({
     if (next.dateFrom) params.set("dateFrom", next.dateFrom);
     if (next.dateTo) params.set("dateTo", next.dateTo);
     if (next.access) params.set("access", next.access);
+    if (next.sharedUserId) params.set("sharedUserId", next.sharedUserId);
     if (next.sort && next.sort !== DEFAULT_MEMORY_SORT_MODE) params.set("sort", next.sort);
     setSearchParams(params);
   }
@@ -218,13 +258,16 @@ export default function MemoriesList({
       dateFrom: filters.dateFrom,
       dateTo: filters.dateTo,
       access: filters.accessType,
+      sharedUserId: filters.sharedUserId,
       sort,
     });
   }
 
   async function onDelete(id: string) {
     const confirmed = window.confirm("Удалить это воспоминание?");
-    if (!confirmed) return;
+    if (!confirmed) {
+      return;
+    }
 
     setBusyId(id);
     setError(null);
@@ -324,8 +367,8 @@ export default function MemoriesList({
               <div className="sectionTitle">Поиск</div>
               <div className="sectionText">
                 {showUserSearch
-                  ? "Поиск по воспоминаниям идет по заголовку, тексту и тегам, по пользователям - по username."
-                  : "Поиск идет по заголовку, тексту и тегам внутри текущего списка воспоминаний."}
+                  ? "Поиск по воспоминаниям идёт по заголовку, тексту, тегам и участникам. Если ввести username, дополнительно находятся публичные воспоминания этого пользователя."
+                  : "Поиск идёт по заголовку, тексту, тегам и участникам внутри текущего списка воспоминаний."}
               </div>
             </div>
           </div>
@@ -333,7 +376,7 @@ export default function MemoriesList({
             <div className="field searchPanelField">
               <input
                 className="input"
-                placeholder="Например, лето или Москва"
+                placeholder="Например, лето, Москва или username"
                 value={searchQuery}
                 onChange={(event) => setSearchQuery(event.target.value)}
                 onKeyDown={(event) => {
@@ -366,6 +409,7 @@ export default function MemoriesList({
                 setSearchQuery("");
                 setAppliedSearchQuery("");
                 setUserResults([]);
+                setPublicSearchResults([]);
                 syncCurrentState({ search: "" });
               }}
             >
@@ -392,6 +436,7 @@ export default function MemoriesList({
       {showFiltersPanel && (
         <MemoryFiltersPanel
           categoryOptions={categoryOptions}
+          sharedUserOptions={sharedUserOptions}
           draftFilters={draftFilters}
           onChange={setDraftFilters}
           onApply={() => {
@@ -417,15 +462,15 @@ export default function MemoriesList({
 
           <div className="searchResultsSection">
             <div className="searchResultsTitle">Воспоминания</div>
-            {memorySearchResults.length > 0 ? (
+            {combinedMemorySearchResults.length > 0 ? (
               <div className="searchResultsList">
-                {memorySearchResults.map((item) => (
+                {combinedMemorySearchResults.map((item) => (
                   <div className="searchResultItem" key={`memory-${item.id}`}>
                     <div className="searchResultBody">
                       <div className="searchResultTitle">{renderHighlightedText(item.title, appliedSearchQuery)}</div>
                       <div className="searchResultPreview">{renderHighlightedText(getMemoryPreview(item), appliedSearchQuery)}</div>
                       <div className="searchResultMeta">
-                        <span>{item.category || "Без категории"}</span>
+                        <span>{item.categories.join(", ") || "Без категории"}</span>
                         <span>{formatDate(item.date)}</span>
                         {item.ownerUsername && <span>@{item.ownerUsername}</span>}
                       </div>
@@ -507,11 +552,15 @@ export default function MemoriesList({
                     )}
                   </div>
                 )}
+
                 <div className="memoryCardTop">
-                  {item.category && <span className="pillBadge">{item.category}</span>}
+                  <div className="tagPreview">
+                    {item.categories.map((category) => <span className="pillBadge" key={`${item.id}-${category}`}>{category}</span>)}
+                  </div>
                   <span className="pillBadge pillBadgeMuted">{getAccessTypeLabel(item.accessType)}</span>
                 </div>
-              <div className="memoryMain">
+
+                <div className="memoryMain">
                   <div className="memoryTitle">{item.title}</div>
                   {item.text && <div className="memoryText">{item.text}</div>}
 
@@ -540,6 +589,7 @@ export default function MemoriesList({
                     {item.emotionTags.length > 0 ? <TagRow label="Эмоции" tags={item.emotionTags} tone="emotion" /> : <div className="tagRow tagRowEmpty" />}
                     {item.placeTags.length > 0 ? <TagRow label="Места" tags={item.placeTags} /> : <div className="tagRow tagRowEmpty" />}
                     {item.customTags.length > 0 ? <TagRow label="Теги" tags={item.customTags} /> : <div className="tagRow tagRowEmpty" />}
+                    {item.sharedWith.length > 0 && <TagRow label="Участники" tags={item.sharedWith.map((share) => `@${share.username}`)} />}
                   </div>
                 </div>
 
@@ -650,7 +700,7 @@ function escapeRegExp(value: string) {
 
 function getScopeError(scope: MemoriesListScope) {
   if (scope === "shared") {
-    return "Пока не удалось загрузить доступные воспоминания. После обновления rules этот раздел должен открываться без технических ошибок.";
+    return "Пока не удалось загрузить доступные воспоминания.";
   }
 
   if (scope === "publicProfile") {
@@ -662,7 +712,7 @@ function getScopeError(scope: MemoriesListScope) {
 
 function getEmptyText(scope: MemoriesListScope) {
   if (scope === "shared") {
-    return "Пока никто не открыл вам shared-воспоминания.";
+    return "Пока никто не открыл вам совместные воспоминания.";
   }
 
   if (scope === "publicProfile") {

@@ -1,4 +1,4 @@
-import { addDoc, collection, deleteDoc, doc, getDoc, onSnapshot, orderBy, query, serverTimestamp } from "firebase/firestore";
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, orderBy, query, serverTimestamp, where } from "firebase/firestore";
 import { db } from "../../../shared/api/firebase/firebase";
 import {
   canUserEditMemory,
@@ -57,6 +57,32 @@ export async function canEditMemory(memoryId: string, userId: string) {
 
 export async function deleteMemoryById(memoryId: string) {
   await deleteDoc(doc(db, "memories", memoryId));
+}
+
+export async function getPublicMemoriesByOwnerIds(ownerIds: string[]) {
+  const uniqueOwnerIds = Array.from(new Set(ownerIds.map((item) => item.trim()).filter(Boolean)));
+  if (uniqueOwnerIds.length === 0) {
+    return [];
+  }
+
+  const snapshots = await Promise.all(
+    uniqueOwnerIds.map((ownerId) => getDocs(
+      query(
+        collection(db, "memories"),
+        where("ownerId", "==", ownerId),
+        where("accessType", "==", "public")
+      )
+    ))
+  );
+
+  const uniqueMemories = new Map<string, NormalizedMemory>();
+  snapshots.forEach((snapshot) => {
+    snapshot.docs.forEach((item) => {
+      uniqueMemories.set(item.id, normalizeMemory(item.id, item.data() as MemoryRecord));
+    });
+  });
+
+  return Array.from(uniqueMemories.values());
 }
 
 export function subscribeToMemoryComments(

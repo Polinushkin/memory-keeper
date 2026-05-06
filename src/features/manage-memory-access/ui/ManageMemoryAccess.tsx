@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { getFriendProfiles, type FriendProfile } from "../../../entities/friend";
+import { getUserProfileById } from "../../../entities/user";
 import type { MemoryAccessType, MemoryShareRole, NormalizedMemoryShare } from "../../../entities/memory";
 import { getErrorMessage } from "../../../shared/lib/firebase-errors";
 import { toggleMemoryShare, updateMemoryShareRole } from "../model/access";
@@ -67,18 +68,38 @@ export default function ManageMemoryAccess({
 
       try {
         const nextFriends = await getFriendProfiles(userId);
+        const visibleFriends = await Promise.all(
+          nextFriends.map(async (friend) => {
+            const profile = await getUserProfileById(friend.id, userId);
+            if (!profile || profile.sharedInvitePolicy !== "friends") {
+              return null;
+            }
+
+            return friend;
+          })
+        );
+
         if (!active) {
           return;
         }
 
-        setFriends(nextFriends);
+        setFriends(visibleFriends.filter((item): item is FriendProfile => Boolean(item)));
       } catch (loadError: unknown) {
         if (!active) {
           return;
         }
 
         setFriends([]);
-        setFriendsError(getErrorMessage(loadError, "Не удалось загрузить список друзей"));
+
+        const code = typeof loadError === "object" && loadError && "code" in loadError
+          ? String(loadError.code)
+          : "";
+
+        if (code === "permission-denied" || code === "firestore/permission-denied") {
+          setFriendsError(null);
+        } else {
+          setFriendsError(getErrorMessage(loadError, "Не удалось загрузить список друзей"));
+        }
       } finally {
         if (active) {
           setLoading(false);
@@ -156,15 +177,15 @@ export default function ManageMemoryAccess({
       <div className="memoryAccessIntro">
         <div className="memoryAccessTitle">Кому открыть воспоминание</div>
         <div className="memoryAccessText">
-          Доступ можно выдать только друзьям. Выберите людей, назначьте им роль и при необходимости отзовите доступ.
+          Доступ можно выдать только друзьям, которые разрешили получать совместные воспоминания. Выберите людей, назначьте им роль и при необходимости отзовите доступ.
         </div>
       </div>
 
       {!isSharedMode && (
         <div className="memoryAccessNotice">
           {hasPresetShares
-            ? "Список друзей сохранён в форме и снова появится, если вернуть режим shared. Пока запись будет сохранена без shared-доступа."
-            : "Shared-доступ включится после выбора режима «совместное»."}
+            ? "Список друзей сохранён в форме и снова появится, если вернуть режим shared. Пока запись будет сохранена без совместного доступа."
+            : "Совместный доступ включится после выбора режима «по ссылке / совместное»."}
         </div>
       )}
 
@@ -215,7 +236,7 @@ export default function ManageMemoryAccess({
       {loading ? (
         <div className="card emptyState">Загрузка друзей...</div>
       ) : friends.length === 0 ? (
-        <div className="card emptyState">Сначала добавьте друзей, чтобы открыть им доступ к воспоминанию.</div>
+        <div className="card emptyState">Сначала добавьте друзей, которые разрешили получать совместные воспоминания, чтобы открыть им доступ.</div>
       ) : visibleFriends.length === 0 ? (
         <div className="card emptyState">Друзья по этому запросу не найдены.</div>
       ) : (
@@ -227,7 +248,7 @@ export default function ManageMemoryAccess({
               <div className="memoryAccessFriendCard" key={friend.id}>
                 <div className="memoryAccessFriendBody">
                   <div className="memoryAccessFriendTitle">@{friend.username}</div>
-                  <div className="memoryAccessFriendMeta">{friend.description || "Друг доступен для shared-доступа"}</div>
+                  <div className="memoryAccessFriendMeta">{friend.description || "Друг доступен для совместного доступа"}</div>
                 </div>
 
                 <div className="memoryAccessFriendControls">

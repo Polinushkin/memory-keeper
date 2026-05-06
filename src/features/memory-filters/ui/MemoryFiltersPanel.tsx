@@ -1,8 +1,14 @@
 import { MEMORY_ACCESS_TYPES } from "../../../entities/memory/model/memory";
 import type { MemoryFilters } from "../../../entities/memory/model/filters";
 
+type SharedUserOption = {
+  userId: string;
+  username: string;
+};
+
 type MemoryFiltersPanelProps = {
   categoryOptions: string[];
+  sharedUserOptions: SharedUserOption[];
   draftFilters: MemoryFilters;
   onChange: (nextFilters: MemoryFilters) => void;
   onApply: () => void;
@@ -11,17 +17,20 @@ type MemoryFiltersPanelProps = {
 
 export default function MemoryFiltersPanel({
   categoryOptions,
+  sharedUserOptions,
   draftFilters,
   onChange,
   onApply,
   onReset,
 }: MemoryFiltersPanelProps) {
+  const isSharedFilterActive = draftFilters.accessType === "shared";
+
   return (
     <section className="card sectionCard floatingPanel">
       <div className="sectionHeader">
         <div>
           <div className="sectionTitle">Фильтры</div>
-          <div className="sectionText">Можно отобрать воспоминания по категории, тегам, месту, диапазону дат и типу доступа.</div>
+          <div className="sectionText">Можно отобрать воспоминания по категориям, тегам, месту, диапазону дат и типу доступа.</div>
         </div>
       </div>
       <div className="filtersGrid">
@@ -36,6 +45,7 @@ export default function MemoryFiltersPanel({
             {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
           </select>
         </div>
+
         <div className="field">
           <label className="label">Тег</label>
           <input
@@ -45,6 +55,7 @@ export default function MemoryFiltersPanel({
             onChange={(event) => onChange({ ...draftFilters, tag: event.target.value })}
           />
         </div>
+
         <div className="field">
           <label className="label">Место</label>
           <input
@@ -54,17 +65,39 @@ export default function MemoryFiltersPanel({
             onChange={(event) => onChange({ ...draftFilters, place: event.target.value })}
           />
         </div>
+
         <div className="field">
           <label className="label">Тип доступа</label>
           <select
             className="input"
             value={draftFilters.accessType}
-            onChange={(event) => onChange({ ...draftFilters, accessType: event.target.value as MemoryFilters["accessType"] })}
+            onChange={(event) => onChange({
+              ...draftFilters,
+              accessType: event.target.value as MemoryFilters["accessType"],
+              sharedUserId: event.target.value === "shared" ? draftFilters.sharedUserId : "",
+            })}
           >
             <option value="">Все типы</option>
             {MEMORY_ACCESS_TYPES.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
           </select>
         </div>
+
+        {isSharedFilterActive && (
+          <div className="field">
+            <label className="label">Кому доступно воспоминание</label>
+            <select
+              className="input"
+              value={draftFilters.sharedUserId}
+              onChange={(event) => onChange({ ...draftFilters, sharedUserId: event.target.value })}
+            >
+              <option value="">Все участники</option>
+              {sharedUserOptions.map((option) => (
+                <option key={option.userId} value={option.userId}>@{option.username}</option>
+              ))}
+            </select>
+          </div>
+        )}
+
         <div className="field">
           <label className="label">Дата события: от</label>
           <input
@@ -74,6 +107,7 @@ export default function MemoryFiltersPanel({
             onChange={(event) => onChange({ ...draftFilters, dateFrom: event.target.value })}
           />
         </div>
+
         <div className="field">
           <label className="label">Дата события: до</label>
           <input

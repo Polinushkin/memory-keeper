@@ -7,11 +7,12 @@ export type MemoryFilters = {
   dateFrom: string;
   dateTo: string;
   accessType: "" | MemoryAccessType;
+  sharedUserId: string;
 };
 
 export function applyMemoryFilters(items: NormalizedMemory[], filters: MemoryFilters) {
   return items
-    .filter((item) => (filters.category ? item.category === filters.category : true))
+    .filter((item) => (filters.category ? item.categories.includes(filters.category) : true))
     .filter((item) => {
       if (!filters.tag.trim()) {
         return true;
@@ -32,5 +33,13 @@ export function applyMemoryFilters(items: NormalizedMemory[], filters: MemoryFil
     })
     .filter((item) => !filters.dateFrom || item.date >= filters.dateFrom)
     .filter((item) => !filters.dateTo || item.date <= filters.dateTo)
-    .filter((item) => (filters.accessType ? item.accessType === filters.accessType : true));
+    .filter((item) => (filters.accessType ? item.accessType === filters.accessType : true))
+    .filter((item) => {
+      if (!filters.sharedUserId) {
+        return true;
+      }
+
+      return item.sharedUserIds.includes(filters.sharedUserId)
+        || item.sharedWith.some((share) => share.userId === filters.sharedUserId);
+    });
 }

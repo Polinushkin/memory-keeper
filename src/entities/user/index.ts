@@ -6,5 +6,17 @@ export {
   type UserReminderSettings,
 } from "./api/preferences";
 export { getEmailByUsername, getUsernameRef, releaseUsername, reserveUsername, updateUsernameMetadata } from "./api/usernames";
-export { getUserProfileById, isUsernameTaken, searchUsersByUsername } from "./api/users";
-export type { UserProfileRow, UserRow, UserSearchResult, UsernameMetadata, UsernameRow } from "./model/user";
+export { getUserProfileById, isUsernameTaken, searchUsersByUsername, searchUsersByUsernameOrEmail } from "./api/users";
+export {
+  getProfileVisibility,
+  getSharedInvitePolicy,
+} from "./model/user";
+export type {
+  ProfileVisibility,
+  SharedInvitePolicy,
+  UserProfileRow,
+  UserRow,
+  UserSearchResult,
+  UsernameMetadata,
+  UsernameRow,
+} from "./model/user";

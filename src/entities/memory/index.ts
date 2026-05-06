@@ -5,6 +5,7 @@ export {
   deleteMemoryById,
   getAccessibleMemoryById,
   getOwnedMemoryById,
+  getPublicMemoriesByOwnerIds,
   subscribeToMemoryComments,
 } from "./api/memories";
 export { applyMemoryFilters } from "./model/filters";
@@ -18,6 +19,7 @@ export {
   getAccessType,
   getAllTags,
   getCategory,
+  getCategories,
   getCustomTags,
   getDateValue,
   getEmotionTags,

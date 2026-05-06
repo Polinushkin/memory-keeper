@@ -92,6 +92,9 @@ export default function SignUpForm() {
         description: "",
         avatarFileName: "",
         avatarDataUrl: "",
+        descriptionVisibility: "public",
+        avatarVisibility: "public",
+        sharedInvitePolicy: "friends",
         createdAt: serverTimestamp(),
       });
 

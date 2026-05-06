@@ -14,11 +14,12 @@ import {
   MEMORY_ACCESS_TYPES,
   findSimilarCategory,
   getAccessType,
-  getCategory,
+  getCategories,
   getCustomTags,
   getEmotionTags,
   getPlaceTags,
   getSharedWith,
+  normalizeCategories,
   parseTagInput,
   validateSharedMemoryAccess,
   type NormalizedMemoryShare,
@@ -52,6 +53,7 @@ type MemoryField =
   | "title"
   | "text"
   | "date"
+  | "time"
   | "place"
   | "category"
   | "emotionTags"
@@ -68,8 +70,9 @@ export default function EditMemoryForm() {
   const [title, setTitle] = useState("");
   const [text, setText] = useState("");
   const [date, setDate] = useState("");
+  const [time, setTime] = useState("");
   const [place, setPlace] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("");
+  const [selectedCategories, setSelectedCategories] = useState<string[]>([]);
   const [newCategory, setNewCategory] = useState("");
   const [categories, setCategories] = useState<string[]>([]);
   const [emotionTags, setEmotionTags] = useState<string[]>([]);
@@ -127,10 +130,11 @@ export default function EditMemoryForm() {
         setTitle(memory.title);
         setText(memory.text);
         setDate(memory.date);
+        setTime(memory.time);
         setPlace(memory.place);
         setMemoryOwnerId(memory.ownerId);
         setMemoryOwnerUsername(memory.ownerUsername);
-        setSelectedCategory(getCategory(memory));
+        setSelectedCategories(getCategories(memory));
         setEmotionTags(getEmotionTags(memory));
         setPlaceTagsInput(getPlaceTags(memory).join(", "));
         setCustomTagsInput(getCustomTags(memory).join(", "));
@@ -151,29 +155,41 @@ export default function EditMemoryForm() {
 
   async function handlePhotosSelect(event: ChangeEvent<HTMLInputElement>) {
     const files = Array.from(event.target.files ?? []);
-    if (fileInputRef.current) fileInputRef.current.value = "";
-    if (files.length === 0) return;
+    if (fileInputRef.current) {
+      fileInputRef.current.value = "";
+    }
+    if (files.length === 0) {
+      return;
+    }
     if (photos.length + files.length > MEMORY_PHOTO_MAX_FILES) {
       setFieldErrors((prev) => ({ ...prev, photos: `Можно сохранить не более ${MEMORY_PHOTO_MAX_FILES} фотографий` }));
       return;
     }
+
     const validationError = validateMemoryPhotos(files);
     if (validationError) {
       setFieldErrors((prev) => ({ ...prev, photos: validationError }));
       return;
     }
+
     try {
       const preparedPhotos: StoredImage[] = [];
       for (const file of files) {
-        const prepared = await prepareImageForFirestore(file, { maxWidth: 1600, maxHeight: 1600, maxBytes: MEMORY_PHOTO_FIRESTORE_MAX_SIZE });
+        const prepared = await prepareImageForFirestore(file, {
+          maxWidth: 1600,
+          maxHeight: 1600,
+          maxBytes: MEMORY_PHOTO_FIRESTORE_MAX_SIZE,
+        });
         preparedPhotos.push({ name: prepared.name, dataUrl: prepared.dataUrl });
       }
+
       const nextPhotos = [...photos, ...preparedPhotos];
       const totalBytes = nextPhotos.reduce((sum, photo) => sum + getDataUrlSize(photo.dataUrl), 0);
       if (totalBytes > MEMORY_PHOTO_FIRESTORE_TOTAL_MAX_SIZE) {
         setFieldErrors((prev) => ({ ...prev, photos: "Суммарный размер фотографий слишком большой для Firestore. Оставьте до 3 небольших изображений." }));
         return;
       }
+
       setPhotos(nextPhotos);
       setFieldErrors((prev) => ({ ...prev, photos: "" }));
     } catch (err: unknown) {
@@ -211,15 +227,21 @@ export default function EditMemoryForm() {
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
     setError(null);
+
     if (!id || !user) {
       setError("Не удалось определить запись для сохранения");
       return;
     }
 
-    const resolvedCategory = newCategory.trim() || selectedCategory;
+    const newCategoryName = newCategory.trim();
+    const resolvedCategories = normalizeCategories({
+      categories: newCategoryName ? [...selectedCategories, newCategoryName] : selectedCategories,
+    });
+    const resolvedCategory = resolvedCategories[0] ?? "";
     const placeTags = parseTagInput(placeTagsInput);
     const customTags = parseTagInput(customTagsInput);
-    const similarCategory = newCategory.trim() ? findSimilarCategory(categories, newCategory) : "";
+    const similarCategory = newCategoryName ? findSimilarCategory(categories, newCategoryName) : "";
+
     const nextErrors: ValidationErrors<MemoryField> = {
       title: validateMemoryTitle(title),
       text: validateMemoryText(text),
@@ -227,25 +249,30 @@ export default function EditMemoryForm() {
       place: validateMemoryPlace(place),
       category: similarCategory
         ? `Похожая категория уже есть: ${similarCategory}`
-        : validateMemoryCategory(resolvedCategory),
+        : validateMemoryCategory(newCategoryName || resolvedCategory),
       emotionTags: emotionTags.length > 0 ? "" : "Выберите хотя бы один тег эмоции",
       placeTags: validateMemoryTagList(placeTags, "Теги мест"),
       customTags: validateMemoryTagList(customTags, "Пользовательские теги"),
       photos: fieldErrors.photos || "",
       sharedWith: validateSharedMemoryAccess(accessType, sharedWith),
     };
+
     setFieldErrors(nextErrors);
-    if (hasValidationErrors(nextErrors)) return;
+    if (hasValidationErrors(nextErrors)) {
+      return;
+    }
 
     setSaving(true);
+
     try {
-      if (newCategory.trim()) {
-        const nextCategories = await appendUserCategory(user.uid, newCategory);
+      if (newCategoryName) {
+        const nextCategories = await appendUserCategory(user.uid, newCategoryName);
         setCategories(nextCategories);
       }
 
       let nextOwnerUsername = memoryOwnerUsername;
       let ownerAvatarDataUrl = "";
+
       if (isOwner) {
         const ownerProfile = await getUserProfileById(user.uid);
         nextOwnerUsername = ownerProfile?.username ?? memoryOwnerUsername;
@@ -265,8 +292,10 @@ export default function EditMemoryForm() {
           title: title.trim(),
           text: text.trim(),
           date,
+          time,
           place: place.trim(),
           category: resolvedCategory.trim(),
+          categories: resolvedCategories,
           emotion: emotionTags[0] ?? "",
           emotionTags,
           placeTags,
@@ -297,8 +326,10 @@ export default function EditMemoryForm() {
           title: title.trim(),
           text: text.trim(),
           date,
+          time,
           place: place.trim(),
           category: resolvedCategory.trim(),
+          categories: resolvedCategories,
           emotion: emotionTags[0] ?? "",
           emotionTags,
           placeTags,
@@ -307,6 +338,7 @@ export default function EditMemoryForm() {
           photoNames: photos.map((photo) => photo.name),
         });
       }
+
       navigate(returnTo || (isOwner ? "/memories" : "/shared-memories"));
     } catch (err: unknown) {
       if (err instanceof Error && err.message.startsWith("CATEGORY_EXISTS:")) {
@@ -322,11 +354,13 @@ export default function EditMemoryForm() {
     }
   }
 
-  if (loading) return <p>Загрузка...</p>;
+  if (loading) {
+    return <p>Загрузка...</p>;
+  }
 
   const placeTagsPreview = parseTagInput(placeTagsInput);
   const customTagsPreview = parseTagInput(customTagsInput);
-  const categoryOptions = Array.from(new Set([...categories, selectedCategory].filter(Boolean))).sort((left, right) => left.localeCompare(right, "ru"));
+  const categoryOptions = Array.from(new Set([...categories, ...selectedCategories].filter(Boolean))).sort((left, right) => left.localeCompare(right, "ru"));
   const returnTo = searchParams.get("returnTo");
 
   return (
@@ -338,27 +372,52 @@ export default function EditMemoryForm() {
           <div className="hint">{title.length}/{MEMORY_TITLE_MAX}</div>
           {fieldErrors.title && <div className="error">{fieldErrors.title}</div>}
         </div>
+
         <div className="field">
           <textarea className={`textarea ${fieldErrors.text ? "inputError" : ""}`} placeholder="Текст воспоминания" value={text} onChange={(e) => setText(e.target.value)} rows={6} maxLength={MEMORY_TEXT_MAX} />
           <div className="hint">Необязательное поле, {text.length}/{MEMORY_TEXT_MAX}</div>
           {fieldErrors.text && <div className="error">{fieldErrors.text}</div>}
         </div>
+
         <div className="field">
           <input className={`input ${fieldErrors.date ? "inputError" : ""}`} type="date" value={date} onChange={(e) => setDate(e.target.value)} />
           {fieldErrors.date && <div className="error">{fieldErrors.date}</div>}
         </div>
+
+        <div className="field">
+          <input className="input" type="time" value={time} onChange={(e) => setTime(e.target.value)} />
+          <div className="hint">Необязательное поле времени события</div>
+        </div>
+
         <div className="field">
           <input className={`input ${fieldErrors.place ? "inputError" : ""}`} placeholder="Основное место события" value={place} onChange={(e) => setPlace(e.target.value)} maxLength={MEMORY_PLACE_MAX} />
           <div className="hint">Необязательное поле, {place.length}/{MEMORY_PLACE_MAX}</div>
           {fieldErrors.place && <div className="error">{fieldErrors.place}</div>}
         </div>
+
         <div className="field">
-          <select className={`input ${fieldErrors.category ? "inputError" : ""}`} value={selectedCategory} onChange={(e) => setSelectedCategory(e.target.value)}>
-            <option value="">Без категории</option>
-            {categoryOptions.map((category) => <option key={category} value={category}>{category}</option>)}
-          </select>
+          {categoryOptions.length > 0 && (
+            <div className={`memoryCategoryChecklist ${fieldErrors.category ? "inputError" : ""}`}>
+              {categoryOptions.map((category) => (
+                <label className="memoryCategoryOption" key={category}>
+                  <input
+                    type="checkbox"
+                    checked={selectedCategories.includes(category)}
+                    onChange={(event) => {
+                      setSelectedCategories((prev) => (
+                        event.target.checked
+                          ? normalizeCategories({ categories: [...prev, category] })
+                          : prev.filter((item) => item !== category)
+                      ));
+                    }}
+                  />
+                  <span>{category}</span>
+                </label>
+              ))}
+            </div>
+          )}
           <input className={`input ${fieldErrors.category ? "inputError" : ""}`} placeholder="Или создайте новую категорию" value={newCategory} onChange={(e) => setNewCategory(e.target.value)} maxLength={MEMORY_CATEGORY_MAX} />
-          <div className="hint">Категория помогает фильтровать и группировать воспоминания</div>
+          <div className="hint">Можно выбрать несколько категорий или создать новую</div>
           {fieldErrors.category && <div className="error">{fieldErrors.category}</div>}
         </div>
 
@@ -473,7 +532,9 @@ export default function EditMemoryForm() {
           )}
           {fieldErrors.photos && <div className="error">{fieldErrors.photos}</div>}
         </div>
+
         {error && <div className="error">{error}</div>}
+
         <div className="rowButtons">
           <button type="button" className="btnSecondary" onClick={() => navigate(returnTo || "/memories")} disabled={saving}>Отмена</button>
           <button className="btnPrimary" disabled={saving}>{saving ? "Сохраняем..." : "Сохранить"}</button>

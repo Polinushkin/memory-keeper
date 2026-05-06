@@ -72,11 +72,23 @@ export async function getFriendProfiles(userId: string) {
     .map((item) => getFriendId(item, userId))
     .filter(Boolean);
 
-  const profiles = await Promise.all(friendIds.map((friendId) => getUserProfile(friendId)));
+  const profiles = await Promise.all(friendIds.map((friendId) => getUserProfile(friendId, userId)));
 
   return profiles
     .filter((item): item is FriendProfile => Boolean(item))
     .sort((left, right) => left.username.localeCompare(right.username, "ru"));
+}
+
+export async function areUsersFriends(leftUserId: string, rightUserId: string) {
+  if (!leftUserId || !rightUserId || leftUserId === rightUserId) {
+    return false;
+  }
+
+  const snapshot = await getDoc(
+    doc(db, FRIENDS_COLLECTION, buildFriendshipId(leftUserId, rightUserId))
+  );
+
+  return snapshot.exists();
 }
 
 export async function sendFriendRequest(params: SendFriendRequestParams) {
@@ -115,11 +127,11 @@ export async function sendFriendRequest(params: SendFriendRequestParams) {
     });
   });
 
-  const actorProfile = await getUserProfileById(fromUserId);
+  const actorProfile = await getUserProfileById(fromUserId, fromUserId);
   await createFriendRequestNotification({
     userId: toUserId,
     actorUserId: fromUserId,
-    actorUsername: params.fromUsername.trim(),
+    actorUsername: actorProfile?.username ?? params.fromUsername.trim(),
     actorAvatarDataUrl: actorProfile?.avatarDataUrl ?? "",
     friendRequestId: nextRequestRef.id,
   });
@@ -269,8 +281,19 @@ async function findPendingFriendRequest(fromUserId: string, toUserId: string) {
   return normalizeFriendRequest(docSnapshot.id, docSnapshot.data() as FriendRequestDocument);
 }
 
-async function getUserProfile(userId: string) {
-  return getUserProfileById(userId);
+async function getUserProfile(userId: string, viewerId: string) {
+  const profile = await getUserProfileById(userId, viewerId);
+  if (!profile) {
+    return null;
+  }
+
+  return {
+    id: profile.id,
+    username: profile.username,
+    usernameLower: profile.usernameLower,
+    description: profile.description,
+    avatarDataUrl: profile.avatarDataUrl,
+  } satisfies FriendProfile;
 }
 
 function sortRequestsByCreatedAtDesc(left: NormalizedFriendRequest, right: NormalizedFriendRequest) {

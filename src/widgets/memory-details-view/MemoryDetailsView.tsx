@@ -54,7 +54,15 @@ export default function MemoryDetailsView({
           return;
         }
 
-        setMemory(nextMemory);
+        if (!nextMemory.ownerUsername && nextMemory.ownerId) {
+          const ownerProfile = await getUserProfileById(nextMemory.ownerId, user.uid);
+          setMemory({
+            ...nextMemory,
+            ownerUsername: ownerProfile?.username ?? "",
+          });
+        } else {
+          setMemory(nextMemory);
+        }
         setPhotoIndex(0);
       } catch (loadError: unknown) {
         if (loadError instanceof Error && loadError.message === "MEMORY_ACCESS_DENIED") {
@@ -157,6 +165,7 @@ export default function MemoryDetailsView({
   }
 
   const activePhoto = memory.photos[photoIndex];
+  const detailsReturnUrl = `/memories/${memory.id}?returnTo=${encodeURIComponent(returnUrl)}`;
 
   return (
     <div className="page">
@@ -170,7 +179,7 @@ export default function MemoryDetailsView({
               <button
                 type="button"
                 className="btnPrimary"
-                onClick={() => navigate(`/memories/${memory.id}/edit?returnTo=${encodeURIComponent(returnUrl)}`)}
+                onClick={() => navigate(`/memories/${memory.id}/edit?returnTo=${encodeURIComponent(detailsReturnUrl)}`)}
               >
                 Редактировать
               </button>
@@ -228,7 +237,9 @@ export default function MemoryDetailsView({
         )}
 
         <div className="memoryCardTop memoryDetailsTop">
-          {memory.category && <span className="pillBadge">{memory.category}</span>}
+          <div className="tagPreview">
+            {memory.categories.map((category) => <span className="pillBadge" key={`${memory.id}-${category}`}>{category}</span>)}
+          </div>
           <span className="pillBadge pillBadgeMuted">{getAccessTypeLabel(memory.accessType)}</span>
         </div>
 
@@ -279,7 +290,7 @@ export default function MemoryDetailsView({
 
         <div className="memoryDetailsBlock memoryDetailsFooterBlock">
           {memory.place && <div className="memoryInlineMeta">Место: {memory.place}</div>}
-          <div className="memoryInlineMeta">Дата события: {formatDate(memory.date)}</div>
+          <div className="memoryInlineMeta">Дата события: {formatEventDateTime(memory.date, memory.time)}</div>
           <div className="memoryInlineMeta">Дата создания: {formatCreatedAt(memory.createdAt)}</div>
         </div>
 
@@ -310,7 +321,7 @@ export default function MemoryDetailsView({
                 </div>
               </div>
             ) : (
-              <div className="emptyState">Комментировать shared-memory могут только участники с правом comment/edit.</div>
+              <div className="emptyState">Комментировать совместное воспоминание могут только участники с правом comment/edit.</div>
             )}
 
             {commentsError && <div className="error">{commentsError}</div>}
@@ -372,6 +383,15 @@ function formatDate(date: string) {
   const [year, month, day] = date.split("-");
   if (!year || !month || !day) return date;
   return `${day}.${month}.${year}`;
+}
+
+function formatEventDateTime(date: string, time: string) {
+  const formattedDate = formatDate(date);
+  if (!time) {
+    return formattedDate;
+  }
+
+  return `${formattedDate}, ${time}`;
 }
 
 function formatCreatedAt(date: Date | null) {

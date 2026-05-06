@@ -2,9 +2,9 @@ import { useState } from "react";
 import type { FormEvent } from "react";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { Link, useNavigate } from "react-router-dom";
+import { getEmailByUsername } from "../../../entities/user";
 import { auth } from "../../../shared/api/firebase/firebase";
 import { getAuthErrorMessage, getErrorMessage } from "../../../shared/lib/firebase-errors";
-import { getEmailByUsername } from "../../../entities/user";
 import { normalizeUsername, type ValidationErrors } from "../../../shared/lib/validation";
 
 type SignInField = "login" | "password";
@@ -26,7 +26,7 @@ export default function SignInForm() {
     setError(null);
 
     const nextErrors: ValidationErrors<SignInField> = {
-      login: login.trim() ? "" : "Введите имя пользователя или email",
+      login: login.trim() ? "" : "Введите имя пользователя",
       password: password ? "" : "Введите пароль",
     };
 
@@ -40,27 +40,25 @@ export default function SignInForm() {
 
     try {
       const loginValue = login.trim();
-      let emailForAuth = loginValue;
+      let emailForAuth = "";
 
-      if (!loginValue.includes("@")) {
-        try {
-          emailForAuth = await getEmailByUsername(normalizeUsername(loginValue));
+      try {
+        emailForAuth = await getEmailByUsername(normalizeUsername(loginValue));
+      } catch (lookupError) {
+        setError(
+          getErrorMessage(
+            lookupError,
+            "Не удалось выполнить вход по имени пользователя"
+          )
+        );
+        setLoading(false);
+        return;
+      }
 
-          if (!emailForAuth) {
-            setError("Пользователь не найден");
-            setLoading(false);
-            return;
-          }
-        } catch (lookupError) {
-          setError(
-            getErrorMessage(
-              lookupError,
-              "Не удалось выполнить вход по имени пользователя. Попробуйте email"
-            )
-          );
-          setLoading(false);
-          return;
-        }
+      if (!emailForAuth) {
+        setError("Неверное имя пользователя или пароль");
+        setLoading(false);
+        return;
       }
 
       await signInWithEmailAndPassword(auth, emailForAuth, password);
@@ -80,7 +78,7 @@ export default function SignInForm() {
         <div className="field">
           <input
             className={`input ${fieldErrors.login ? "inputError" : ""}`}
-            placeholder="Имя пользователя или email"
+            placeholder="Имя пользователя"
             value={login}
             onChange={(e) => setLogin(e.target.value)}
             autoComplete="username"
@@ -113,6 +111,9 @@ export default function SignInForm() {
 
         <Link className="smallLink" to="/register">
           Нет аккаунта? Зарегистрироваться
+        </Link>
+        <Link className="smallLink" to="/forgot-password">
+          Забыли пароль?
         </Link>
 
         <button className="btnPrimary" disabled={loading}>

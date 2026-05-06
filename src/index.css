@@ -15,12 +15,13 @@ body {
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif;
   background: var(--bg);
   color: var(--text);
+  overflow-x: hidden;
 }
 
 .app { min-height: 100vh; }
 
 .topbar {
-  max-width: 1100px;
+  width: min(calc(100% - 32px), 1100px);
   margin: 24px auto 0;
   padding: 12px 16px;
   border-radius: 14px;
@@ -48,6 +49,11 @@ body {
   padding: 10px 14px;
   border-radius: 12px;
   font: inherit;
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 
 .navBtnWithBadge {
@@ -73,12 +79,12 @@ body {
 .page {
   display: grid;
   place-items: center;
-  padding: 48px 16px;
+  padding: 40px 12px;
 }
 .pageWide {
-  max-width: 1100px;
+  width: min(100%, 1100px);
   margin: 0 auto;
-  padding: 32px 16px 64px;
+  padding: 32px 12px 64px;
 }
 
 .authCard {
@@ -144,6 +150,10 @@ body {
   color: #1f2937;
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 .btnPrimary:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -318,6 +328,10 @@ body {
   color: var(--text);
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
 }
 .btnSecondary:disabled { opacity: 0.6; cursor: not-allowed; }
 
@@ -326,6 +340,7 @@ body {
   gap: 10px;
   margin-top: 12px;
   justify-content: center;
+  flex-wrap: wrap;
 }
 
 .btnSmall {
@@ -336,6 +351,11 @@ body {
   background: rgba(0,0,0,0.08);
   font-weight: 700;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .btnSmallDanger {
@@ -347,6 +367,11 @@ body {
   color: #b00020;
   font-weight: 800;
   cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  line-height: 1.2;
 }
 
 .btnSmall:disabled,
@@ -368,7 +393,7 @@ body {
 
 .sectionHeader {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
   margin-bottom: 16px;
@@ -723,6 +748,38 @@ body {
   gap: 12px;
 }
 
+.profilePrivacyGrid {
+  align-items: start;
+}
+
+.profilePrivacyField {
+  display: flex;
+  flex-direction: column;
+}
+
+.profilePrivacyLabel {
+  min-height: 56px;
+  display: flex;
+  align-items: flex-end;
+}
+
+.memoryCategoryChecklist {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  padding: 14px 16px;
+  border: 1px solid rgba(17, 24, 39, 0.12);
+  border-radius: 18px;
+  background: rgba(255, 255, 255, 0.92);
+}
+
+.memoryCategoryOption {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text);
+}
+
 .filterActions {
   justify-content: end;
 }
@@ -773,6 +830,15 @@ body {
 
 .searchResultButton {
   width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 0;
   cursor: pointer;
   text-align: left;
   font: inherit;
@@ -843,6 +909,32 @@ body {
 .profileDashboard {
   display: grid;
   gap: 18px;
+  width: 100%;
+  margin: 0 auto;
+}
+
+.profileDashboard > .sectionCard {
+  width: 100%;
+  margin: 0 auto;
+}
+
+.profileDashboard .sectionHeader > * {
+  min-width: 0;
+}
+
+.profileDashboard .toggleButton,
+.profileDashboard .oldNotificationsButton,
+.profileDashboard .notificationCard,
+.profileDashboard .memoryOfDayCard,
+.profileDashboard .statsChartCard,
+.profileDashboard .statCard {
+  max-width: 100%;
+}
+
+.profileDashboard .searchUserIdentity,
+.profileDashboard .searchResultBody,
+.profileDashboard .notificationActionColumn {
+  min-width: 0;
 }
 
 .notificationsList {
@@ -1182,6 +1274,7 @@ body {
   gap: 4px;
   min-width: 0;
   text-align: left;
+  flex: 1;
 }
 
 .friendCardTitle {
@@ -1198,15 +1291,33 @@ body {
   gap: 10px;
   flex-wrap: wrap;
   justify-content: flex-end;
+  align-items: center;
 }
 
 .friendStateBadge {
+  min-height: 34px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   padding: 6px 10px;
   border-radius: 999px;
   background: rgba(17, 24, 39, 0.08);
   color: rgba(17, 24, 39, 0.72);
   font-size: 12px;
   font-weight: 700;
+  text-align: center;
+}
+
+.friendCard .searchResultPreview {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  min-height: 2.9em;
+}
+
+.friendCard .searchUserIdentity {
+  flex: 1;
 }
 
 .friendStateBadgeAccent {
@@ -1354,6 +1465,32 @@ body {
   display: flex;
   justify-content: center;
   margin-top: 16px;
+}
+
+.publicProfileActionsTop {
+  justify-content: flex-start;
+  margin-top: 0;
+  margin-bottom: 16px;
+}
+
+@media (max-width: 900px) {
+  .topbar {
+    width: min(calc(100% - 24px), 1100px);
+    padding: 10px 12px;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .nav {
+    gap: 8px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .navBtn {
+    padding: 10px 12px;
+    min-height: 42px;
+  }
 }
 
 .memoriesSections {
@@ -1677,7 +1814,27 @@ body {
 
 /* Mobile */
 @media (max-width: 760px) {
-  .topbar { margin-top: 16px; }
+  .topbar {
+    width: calc(100% - 20px);
+    margin-top: 10px;
+    padding: 10px;
+  }
+  .page {
+    padding: 24px 10px;
+  }
+  .pageWide {
+    padding: 20px 10px 40px;
+  }
+  .profileDashboard {
+    width: 100%;
+    max-width: 760px;
+    margin: 0 auto;
+  }
+  .profileDashboard > .sectionCard {
+    width: 100%;
+    padding: 16px;
+    overflow-x: clip;
+  }
   .grid { grid-template-columns: 1fr; }
   .filtersGrid,
   .accessTypeGrid,
@@ -1704,13 +1861,16 @@ body {
     flex-direction: column;
     align-items: stretch;
   }
+  .pwRow {
+    grid-template-columns: 1fr;
+  }
   .searchResultItem,
   .notificationCard,
   .categoryManagerItem,
+  .friendCard,
   .topbar,
   .nav,
-  .sectionHeader,
-  .publicProfileHeader {
+  .sectionHeader {
     flex-direction: column;
     align-items: stretch;
   }
@@ -1729,6 +1889,27 @@ body {
   .notificationActionColumn {
     justify-items: stretch;
   }
+  .friendActionGroup {
+    justify-content: stretch;
+  }
+  .publicProfileHeader {
+    flex-direction: row;
+    align-items: center;
+    gap: 14px;
+  }
+  .publicProfileAvatar,
+  .publicProfileAvatarPlaceholder {
+    width: 84px;
+    height: 84px;
+  }
+  .publicProfileBody {
+    align-content: center;
+  }
+  .profileDashboard .oldNotificationsButton,
+  .profileDashboard .toggleButton {
+    max-width: 100%;
+    width: fit-content;
+  }
   .memoryOfDayCard {
     grid-template-columns: 1fr;
   }
@@ -1737,5 +1918,15 @@ body {
   }
   .filePickerText {
     white-space: normal;
+  }
+}
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .pageWide {
+    padding: 18px 10px 36px;
+  }
+
+  .grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

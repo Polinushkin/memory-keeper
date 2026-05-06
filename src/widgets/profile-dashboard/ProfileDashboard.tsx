@@ -22,9 +22,11 @@ import {
   getUserReminderSettings,
   updateDailyRemindersEnabled,
   updateLastDailyReminderDate,
+  getUserProfileById,
 } from "../../entities/user";
 import {
   getFriendRequestById,
+  getFriendProfiles,
   respondToFriendRequest,
   type FriendRequestStatus,
 } from "../../entities/friend";
@@ -53,6 +55,8 @@ export default function ProfileDashboard() {
   const [notifications, setNotifications] = useState<NormalizedNotification[]>([]);
   const [sessionUnreadIds, setSessionUnreadIds] = useState<Set<string>>(new Set());
   const [friendRequestStatuses, setFriendRequestStatuses] = useState<FriendRequestStatusMap>({});
+  const [friendIds, setFriendIds] = useState<Set<string>>(new Set());
+  const [actorUsernames, setActorUsernames] = useState<Record<string, string>>({});
   const [statistics, setStatistics] = useState<MemoryStatistics>(EMPTY_STATISTICS);
   const [ownedMemories, setOwnedMemories] = useState<Awaited<ReturnType<typeof getOwnedMemoriesForStatistics>>>([]);
   const [dailyRemindersEnabled, setDailyRemindersEnabled] = useState(false);
@@ -88,12 +92,14 @@ export default function ProfileDashboard() {
     void Promise.all([
       getOwnedMemoriesForStatistics(user.uid),
       getUserReminderSettings(user.uid),
+      getFriendProfiles(user.uid),
     ])
-      .then(([memories, settings]) => {
+      .then(([memories, settings, friends]) => {
         setOwnedMemories(memories);
         setStatistics(buildMemoryStatistics(memories));
         setDailyRemindersEnabled(settings.dailyRemindersEnabled);
         setLastDailyReminderDate(settings.lastDailyReminderDate);
+        setFriendIds(new Set(friends.map((friend) => friend.id)));
       })
       .catch((loadError: unknown) => {
         setError(getErrorMessage(loadError, "Не удалось загрузить данные профиля"));
@@ -136,6 +142,40 @@ export default function ProfileDashboard() {
       isCancelled = true;
     };
   }, [notifications]);
+
+  useEffect(() => {
+    const actorIds = Array.from(
+      new Set(
+        notifications
+          .filter((item) => item.type === "friend_request" && item.actorUserId)
+          .map((item) => item.actorUserId)
+      )
+    );
+
+    if (actorIds.length === 0) {
+      setActorUsernames({});
+      return;
+    }
+
+    let isCancelled = false;
+
+    void Promise.all(
+      actorIds.map(async (actorId) => {
+        const profile = await getUserProfileById(actorId, user?.uid);
+        return [actorId, profile?.username ?? ""] as const;
+      })
+    ).then((entries) => {
+      if (!isCancelled) {
+        setActorUsernames(
+          Object.fromEntries(entries.filter((entry) => entry[1]))
+        );
+      }
+    });
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [notifications, user?.uid]);
 
   useEffect(() => {
     if (!user || !dailyRemindersEnabled || loading) {
@@ -265,6 +305,9 @@ export default function ProfileDashboard() {
         ...prev,
         [notification.friendRequestId]: action === "accept" ? "accepted" : "declined",
       }));
+      if (action === "accept" && notification.actorUserId) {
+        setFriendIds((prev) => new Set(prev).add(notification.actorUserId));
+      }
     } catch (actionError: unknown) {
       setError(getErrorMessage(actionError, action === "accept" ? "Не удалось принять заявку" : "Не удалось отклонить заявку"));
     } finally {
@@ -332,6 +375,8 @@ export default function ProfileDashboard() {
                 notification={notification}
                 busyKey={busyKey}
                 friendRequestStatus={notification.friendRequestId ? friendRequestStatuses[notification.friendRequestId] : undefined}
+                canonicalActorUsername={notification.actorUserId ? actorUsernames[notification.actorUserId] : ""}
+                isFriend={Boolean(notification.actorUserId && friendIds.has(notification.actorUserId))}
                 onAccept={() => void handleFriendRequestAction(notification, "accept")}
                 onDecline={() => void handleFriendRequestAction(notification, "decline")}
                 onOpen={() => void handleOpenNotification(notification)}
@@ -363,6 +408,8 @@ export default function ProfileDashboard() {
                     notification={notification}
                     busyKey={busyKey}
                     friendRequestStatus={notification.friendRequestId ? friendRequestStatuses[notification.friendRequestId] : undefined}
+                    canonicalActorUsername={notification.actorUserId ? actorUsernames[notification.actorUserId] : ""}
+                    isFriend={Boolean(notification.actorUserId && friendIds.has(notification.actorUserId))}
                     onAccept={() => void handleFriendRequestAction(notification, "accept")}
                     onDecline={() => void handleFriendRequestAction(notification, "decline")}
                     onOpen={() => void handleOpenNotification(notification)}
@@ -428,6 +475,8 @@ type NotificationCardProps = {
   notification: NormalizedNotification;
   busyKey: string;
   friendRequestStatus?: FriendRequestStatus;
+  canonicalActorUsername?: string;
+  isFriend?: boolean;
   onAccept: () => void;
   onDecline: () => void;
   onOpen: () => void;
@@ -440,6 +489,8 @@ function NotificationCard({
   notification,
   busyKey,
   friendRequestStatus,
+  canonicalActorUsername = "",
+  isFriend = false,
   onAccept,
   onDecline,
   onOpen,
@@ -447,7 +498,10 @@ function NotificationCard({
   onUnread,
   isOld = false,
 }: NotificationCardProps) {
-  const status = friendRequestStatus ?? (notification.type === "friend_request" ? "pending" : undefined);
+  const status = notification.type === "friend_request" && isFriend
+    ? "accepted"
+    : (friendRequestStatus ?? (notification.type === "friend_request" ? "pending" : undefined));
+  const actorUsername = canonicalActorUsername || notification.actorUsername;
   const canOpenMemory = (notification.type === "shared_memory" || notification.type === "memory_of_day") && notification.memoryId;
   const showFriendActions = notification.type === "friend_request" && status === "pending";
 
@@ -455,15 +509,15 @@ function NotificationCard({
     <article className={`notificationCard ${isOld || notification.isRead ? "notificationCardRead" : ""}`}>
       <div className="searchUserIdentity">
         {notification.actorAvatarDataUrl ? (
-          <img className="searchUserAvatar" src={notification.actorAvatarDataUrl} alt={notification.actorUsername} />
+          <img className="searchUserAvatar" src={notification.actorAvatarDataUrl} alt={actorUsername} />
         ) : (
           <div className="searchUserAvatarPlaceholder">
-            {(notification.actorUsername || notification.memoryTitle || "M").slice(0, 1).toUpperCase()}
+            {(actorUsername || notification.memoryTitle || "M").slice(0, 1).toUpperCase()}
           </div>
         )}
         <div className="searchResultBody">
           <div className="searchResultTitle">{getNotificationTitle(notification)}</div>
-          <div className="searchResultPreview">{getNotificationDescription(notification, status)}</div>
+          <div className="searchResultPreview">{getNotificationDescription(notification, status, actorUsername)}</div>
           <div className="searchResultMeta">
             <span>{formatDateTime(notification.createdAt)}</span>
             {!notification.isRead && <span>Новое</span>}
@@ -689,12 +743,13 @@ function getNotificationTitle(notification: NormalizedNotification) {
 
 function getNotificationDescription(
   notification: NormalizedNotification,
-  friendRequestStatus?: FriendRequestStatus
+  friendRequestStatus?: FriendRequestStatus,
+  actorUsername?: string
 ) {
   if (notification.type === "friend_request") {
     if (friendRequestStatus === "accepted") {
-      return notification.actorUsername
-        ? `Вы добавили @${notification.actorUsername} в друзья.`
+      return actorUsername
+        ? `Вы добавили @${actorUsername} в друзья.`
         : "Пользователь добавлен в друзья.";
     }
 
@@ -706,8 +761,8 @@ function getNotificationDescription(
       return "Отправитель отозвал заявку в друзья.";
     }
 
-    return notification.actorUsername
-      ? `@${notification.actorUsername} отправил(а) вам заявку в друзья.`
+    return actorUsername
+      ? `@${actorUsername} отправил(а) вам заявку в друзья.`
       : "Получена новая заявка в друзья.";
   }
 
