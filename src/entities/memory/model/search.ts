@@ -26,6 +26,7 @@ function getMemorySearchText(item: NormalizedMemory) {
   return [
     item.title,
     item.text,
+    item.place,
     item.ownerUsername,
     ...item.categories,
     ...item.emotionTags,

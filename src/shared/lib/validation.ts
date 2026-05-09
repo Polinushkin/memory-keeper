@@ -5,6 +5,7 @@ export const MEMORY_TITLE_MAX = 100;
 export const MEMORY_TEXT_MAX = 10000;
 export const MEMORY_PLACE_MAX = 100;
 export const MEMORY_CATEGORY_MAX = 50;
+export const MEMORY_PLACE_TAG_MAX = 50;
 export const MEMORY_TAG_MAX = 30;
 export const MEMORY_TAGS_PER_GROUP_MAX = 10;
 export const PROFILE_PHOTO_MAX_SIZE = 5 * 1024 * 1024;
@@ -178,14 +179,14 @@ export function validateMemoryEmotion(emotion: string) {
   return "";
 }
 
-export function validateMemoryTagList(tags: string[], label: string) {
+export function validateMemoryTagList(tags: string[], label: string, maxLength = MEMORY_TAG_MAX) {
   if (tags.length > MEMORY_TAGS_PER_GROUP_MAX) {
     return `${label}: не более ${MEMORY_TAGS_PER_GROUP_MAX} тегов`;
   }
 
-  const oversizedTag = tags.find((tag) => tag.length > MEMORY_TAG_MAX);
+  const oversizedTag = tags.find((tag) => tag.length > maxLength);
   if (oversizedTag) {
-    return `${label}: каждый тег должен быть не длиннее ${MEMORY_TAG_MAX} символов`;
+    return `${label}: каждый тег должен быть не длиннее ${maxLength} символов`;
   }
 
   return "";

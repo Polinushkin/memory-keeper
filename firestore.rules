@@ -23,17 +23,15 @@ service cloud.firestore {
     }
 
     function isSharedEditor() {
-      return isSignedIn() && (
-        (resource.data.sharedEditorIds is list && resource.data.sharedEditorIds.hasAny([request.auth.uid]))
-        || isListedEditor(resource.data.sharedWith)
-      );
+      return isSignedIn()
+        && resource.data.sharedEditorIds is list
+        && resource.data.sharedEditorIds.hasAny([request.auth.uid]);
     }
 
     function isSharedCommenter() {
-      return isSignedIn() && (
-        (resource.data.sharedCommenterIds is list && resource.data.sharedCommenterIds.hasAny([request.auth.uid]))
-        || isListedCommenter(resource.data.sharedWith)
-      );
+      return isSignedIn()
+        && resource.data.sharedCommenterIds is list
+        && resource.data.sharedCommenterIds.hasAny([request.auth.uid]);
     }
 
     function hasValidSharedFields(data) {
@@ -105,48 +103,12 @@ service cloud.firestore {
         && data.accessType == "shared"
         && (
           data.ownerId == request.auth.uid
-          || (
-            (data.sharedCommenterIds is list && data.sharedCommenterIds.hasAny([request.auth.uid]))
-            || isListedCommenter(data.sharedWith)
-          )
+          || (data.sharedCommenterIds is list && data.sharedCommenterIds.hasAny([request.auth.uid]))
         );
     }
 
     function parentMemory(memoryId) {
       return get(/databases/$(database)/documents/memories/$(memoryId));
-    }
-
-    function isListedEditor(sharedWith) {
-      return sharedWith is list && (
-        hasEditRoleAt(sharedWith, 0) || hasEditRoleAt(sharedWith, 1) || hasEditRoleAt(sharedWith, 2) ||
-        hasEditRoleAt(sharedWith, 3) || hasEditRoleAt(sharedWith, 4) || hasEditRoleAt(sharedWith, 5) ||
-        hasEditRoleAt(sharedWith, 6) || hasEditRoleAt(sharedWith, 7) || hasEditRoleAt(sharedWith, 8) ||
-        hasEditRoleAt(sharedWith, 9) || hasEditRoleAt(sharedWith, 10) || hasEditRoleAt(sharedWith, 11)
-      );
-    }
-
-    function isListedCommenter(sharedWith) {
-      return sharedWith is list && (
-        hasCommentRoleAt(sharedWith, 0) || hasCommentRoleAt(sharedWith, 1) || hasCommentRoleAt(sharedWith, 2) ||
-        hasCommentRoleAt(sharedWith, 3) || hasCommentRoleAt(sharedWith, 4) || hasCommentRoleAt(sharedWith, 5) ||
-        hasCommentRoleAt(sharedWith, 6) || hasCommentRoleAt(sharedWith, 7) || hasCommentRoleAt(sharedWith, 8) ||
-        hasCommentRoleAt(sharedWith, 9) || hasCommentRoleAt(sharedWith, 10) || hasCommentRoleAt(sharedWith, 11)
-      );
-    }
-
-    function hasEditRoleAt(sharedWith, index) {
-      return sharedWith.size() > index
-        && sharedWith[index].userId == request.auth.uid
-        && sharedWith[index].role == "edit";
-    }
-
-    function hasCommentRoleAt(sharedWith, index) {
-      return sharedWith.size() > index
-        && sharedWith[index].userId == request.auth.uid
-        && (
-          sharedWith[index].role == "comment"
-          || sharedWith[index].role == "edit"
-        );
     }
 
     function canReadMemory() {

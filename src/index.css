@@ -631,9 +631,9 @@ body {
   font-size: 12px;
   font-weight: 700;
   max-width: 100%;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .pillBadgeMuted {

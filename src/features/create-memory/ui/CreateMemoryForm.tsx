@@ -27,6 +27,7 @@ import {
   MEMORY_PHOTO_MAX_FILES,
   MEMORY_PHOTO_MAX_SIZE,
   MEMORY_PLACE_MAX,
+  MEMORY_PLACE_TAG_MAX,
   MEMORY_TAG_MAX,
   MEMORY_TEXT_MAX,
   MEMORY_TITLE_MAX,
@@ -191,7 +192,7 @@ export default function CreateMemoryForm() {
         ? `Похожая категория уже есть: ${similarCategory}`
         : validateMemoryCategory(newCategoryName || resolvedCategory),
       emotionTags: emotionTags.length > 0 ? "" : "Выберите хотя бы один тег эмоции",
-      placeTags: validateMemoryTagList(placeTags, "Теги мест"),
+      placeTags: validateMemoryTagList(placeTags, "Теги мест", MEMORY_PLACE_TAG_MAX),
       customTags: validateMemoryTagList(customTags, "Пользовательские теги"),
       photos: fieldErrors.photos || "",
       sharedWith: validateSharedMemoryAccess(accessType, sharedWith),
@@ -348,7 +349,7 @@ export default function CreateMemoryForm() {
 
         <div className="field">
           <input className={`input ${fieldErrors.placeTags ? "inputError" : ""}`} placeholder="Теги мест через запятую: парк, Москва, море" value={placeTagsInput} onChange={(e) => setPlaceTagsInput(e.target.value)} />
-          <div className="hint">До 10 тегов, каждый до {MEMORY_TAG_MAX} символов</div>
+          <div className="hint">До 10 тегов, каждый до {MEMORY_PLACE_TAG_MAX} символов</div>
           {placeTagsPreview.length > 0 && <div className="tagPreview">{placeTagsPreview.map((tag) => <span key={tag}>{tag}</span>)}</div>}
           {fieldErrors.placeTags && <div className="error">{fieldErrors.placeTags}</div>}
         </div>
